@@ -15,10 +15,16 @@
 #     host    -> device-ref, resolves against the device/connection layer
 #                (credential store: connection.paths, multi-path priority)
 #     model   -> tier-ref, resolves against the model config layer (L2)
+#                tier semantics: 06 §5.1 (standard = full capability,
+#                light = cost/speed; concrete models live in L2, not here)
 #     channel -> chan-ref, resolves against the channel registration
 #     owner   -> agent-ref, must point at another agent in THIS registry
 #   Replacing a component of the ecosystem (e.g. GPG -> Vault, astra-sre ->
 #   own monitoring) changes only the resolution target, never this file.
+#
+# VALIDATION:
+#   python3 scripts/registry-check.py templates/agent-registry/registry.yaml.example  (public: all placeholders)
+#   python3 scripts/registry-check.py --private agent-registry/registry.yaml          (private: real values)
 
 meta:
   constellation: astra-agent-constellation
