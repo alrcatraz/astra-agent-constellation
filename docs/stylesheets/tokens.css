@@ -1,0 +1,200 @@
+/* Constellation design tokens — IBM Carbon design language per DESIGN.md.
+   No webfont CDN: system font stack keeps the site loadable in mainland China. */
+
+:root {
+  /* DESIGN.md colors (Carbon tokens) */
+  --cn-primary: #161616;      /* Gray 100 */
+  --cn-secondary: #0F62FE;    /* Blue 60 */
+  --cn-tertiary: #525252;     /* Gray 70 */
+  --cn-neutral: #FFFFFF;      /* White */
+  --cn-surface: #F4F4F4;      /* Gray 10 */
+  --cn-surface-hover: #E8E8E8;
+  --cn-border: #C6C6C6;       /* Gray 30 */
+  --cn-on-accent: #FFFFFF;
+  --cn-blue-70: #0043CE;
+  --cn-blue-40: #78A9FF;
+  --cn-danger: #DA1E28;
+  --cn-warning: #F1C21B;
+  --cn-success: #24A148;
+
+  /* Derived component tokens — light scheme defaults */
+  --cn-table-header-bg: var(--cn-primary);
+  --cn-table-header-fg: var(--cn-neutral);
+  --cn-table-zebra: var(--cn-surface);
+  --cn-table-border: var(--cn-border);
+  --cn-chip-bg: var(--cn-surface);
+  --cn-chip-fg: var(--cn-primary);
+  --cn-admonition-bg: var(--cn-surface);
+  --cn-masthead-border: var(--cn-border);
+  --cn-link-hover: var(--cn-blue-70);   /* light scheme: Blue 70 on hover */
+
+  /* SVG diagram tokens — light scheme (inline SVGs inherit these) */
+  --cn-svg-bg: #FFFFFF;
+  --cn-svg-fg: #161616;
+  --cn-svg-fg-sub: #525252;
+  --cn-svg-surface: #F4F4F4;
+  --cn-svg-border: #C6C6C6;
+  --cn-svg-accent: #0F62FE;
+  --cn-svg-block: #161616;      /* solid dark block (orchestrator disc) */
+  --cn-svg-on-block: #FFFFFF;
+  --cn-svg-on-accent: #FFFFFF;
+
+  /* MkDocs Material variable overrides (light scheme) */
+  --md-primary-fg-color: var(--cn-primary);
+  --md-primary-fg-color--light: var(--cn-tertiary);
+  --md-primary-fg-color--dark: #000000;
+  --md-accent-fg-color: var(--cn-secondary);
+  --md-typeset-a-color: var(--cn-secondary);
+  --md-default-bg-color: var(--cn-neutral);
+  --md-default-fg-color: var(--cn-primary);
+  --md-code-bg-color: var(--cn-surface);
+  --md-code-fg-color: var(--cn-primary);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--cn-primary);
+  --md-primary-fg-color--light: #393939;
+  --md-primary-fg-color--dark: #000000;
+  --md-accent-fg-color: var(--cn-blue-40);
+  --md-typeset-a-color: var(--cn-blue-40);
+  --md-default-bg-color: var(--cn-primary);
+  --md-default-fg-color: var(--cn-neutral);
+  --md-default-fg-color--light: #C6C6C6;
+  --md-code-bg-color: #262626;
+  --md-code-fg-color: var(--cn-neutral);
+
+  /* Dark component tokens — Carbon dark surfaces */
+  --cn-table-header-bg: #393939;   /* Gray 80 */
+  --cn-table-header-fg: #F4F4F4;   /* Gray 10 */
+  --cn-table-zebra: #262626;       /* Gray 90 */
+  --cn-table-border: #525252;      /* Gray 70 */
+  --cn-chip-bg: #262626;           /* Gray 90 */
+  --cn-chip-fg: #F4F4F4;           /* Gray 10 */
+  --cn-admonition-bg: #262626;     /* Gray 90 */
+  --cn-masthead-border: #525252;   /* Gray 70 */
+  --cn-link-hover: var(--cn-blue-40);   /* dark scheme: lighter Blue 40 for contrast */
+
+  /* SVG diagram tokens — dark scheme */
+  --cn-svg-bg: #161616;           /* Gray 100 — blends with page bg */
+  --cn-svg-fg: #F4F4F4;           /* Gray 10 */
+  --cn-svg-fg-sub: #C6C6C6;       /* Gray 30 */
+  --cn-svg-surface: #262626;      /* Gray 90 */
+  --cn-svg-border: #525252;       /* Gray 70 */
+  --cn-svg-accent: #78A9FF;       /* Blue 40 */
+  --cn-svg-block: #393939;        /* Gray 80 */
+  --cn-svg-on-block: #FFFFFF;
+  --cn-svg-on-accent: #161616;
+}
+
+/* System font stack — IBM Plex first, CJK fallback, no external requests */
+body,
+.md-typeset {
+  font-family: "IBM Plex Sans", "Noto Sans SC", "Source Han Sans SC",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+code,
+pre,
+.md-typeset code {
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Noto Sans Mono CJK SC",
+    Consolas, monospace;
+}
+
+/* Zero radius everywhere — the Carbon identity */
+.md-typeset code,
+.md-typeset .admonition,
+.md-typeset table:not([class]),
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td,
+.md-typeset .md-button,
+.md-header,
+.md-tabs {
+  border-radius: 0;
+}
+
+/* Links: Blue 60, hover Blue 70 with underline */
+.md-typeset a {
+  transition: color 0.15s ease;
+}
+.md-typeset a:hover {
+  color: var(--cn-link-hover);
+  text-decoration: underline;
+}
+
+/* Fight Material's built-in indigo link colour under slate (its
+   [data-md-color-scheme=slate][data-md-color-primary=indigo] rule
+   has higher specificity than our bare slate block). */
+[data-md-color-scheme="slate"][data-md-color-primary="indigo"] {
+  --md-typeset-a-color: var(--cn-blue-40);
+}
+
+/* Tables: header fill + zebra striping, both schemes via derived tokens */
+.md-typeset table:not([class]) {
+  border-color: var(--cn-table-border);
+}
+.md-typeset table:not([class]) th {
+  background-color: var(--cn-table-header-bg);
+  color: var(--cn-table-header-fg);
+  font-weight: 600;
+}
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  border-color: var(--cn-table-border);
+}
+.md-typeset table:not([class]) tr:nth-child(even) {
+  background-color: var(--cn-table-zebra);
+}
+
+/* Inline code chip: derived surface + fg */
+.md-typeset code {
+  background-color: var(--cn-chip-bg);
+  color: var(--cn-chip-fg);
+}
+
+/* Admonitions: derived surface, neutral title band (kill Material's
+   indigo #448aff1a title fill which looks wrong in dark mode) */
+.md-typeset .admonition {
+  border: 1px solid var(--cn-border);
+  border-left: 2px solid var(--cn-secondary);
+  background: var(--cn-admonition-bg);
+  font-size: 0.875rem;
+}
+.md-typeset .admonition > .admonition-title {
+  background-color: transparent;
+  color: inherit;
+}
+.md-typeset .admonition > .admonition-title::before {
+  background-color: var(--cn-secondary);
+}
+.md-typeset .admonition.warning {
+  border-left-color: var(--cn-warning);
+}
+.md-typeset .admonition.warning > .admonition-title::before {
+  background-color: var(--cn-warning);
+}
+.md-typeset .admonition.danger {
+  border-left-color: var(--cn-danger);
+}
+.md-typeset .admonition.danger > .admonition-title::before {
+  background-color: var(--cn-danger);
+}
+
+/* Header masthead: Gray 100, hairline bottom border instead of shadow */
+.md-header {
+  background-color: var(--cn-primary);
+  box-shadow: 0 1px 0 var(--cn-masthead-border);
+}
+
+/* Inline SVG figures: full width, horizontal scroll on narrow viewports
+   so diagram text stays readable (800-viewBox 1:1 min-width) */
+.cn-figure {
+  margin: 1.5rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.cn-figure svg {
+  display: block;
+  width: 100%;
+  min-width: 800px;
+  height: auto;
+}
