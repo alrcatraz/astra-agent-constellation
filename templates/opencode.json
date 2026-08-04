@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "default": {
+      "baseURL": "http://127.0.0.1:20128",
+      "models": {
+        "coding": { "name": "deepseek-coding" }
+      }
+    }
+  },
+  "permissions": {
+    "deny": ["git push *", "rm -rf *", "env"],
+    "ask": ["git commit *", "git push origin main"],
+    "allow": ["read", "edit", "bash", "glob", "grep"]
+  },
+  "tools": {
+    "disabled": ["python", "browser"]
+  },
+  "mcp": {
+    "ai-gate": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3002/sse",
+      "enabled": false
+    }
+  },
+  "model": "coding",
+  "autoupdate": false
+}
