@@ -1,0 +1,85 @@
+# Agent Registry — single source of truth for every agent in the constellation.
+#
+# Maintained by the Guardian. The orchestrator reads it. Every deploy/upgrade/
+# recovery action MUST be reflected here (git history = audit trail).
+#
+# Copy to agent-registry/registry.yaml and adapt. Hostnames are sanitised
+# placeholders in the public copy; the private copy holds real values.
+# Written in British English.
+#
+# FIELD SEMANTICS — reference, not copy (ADR 0001, section 1; 06 §5):
+#   The registry stores only facts that belong to the AGENT'S OWN LIFECYCLE.
+#   Facts that belong to another layer (machine addressing, model config,
+#   secrets) are REFERENCED, never duplicated. Each reference names the layer
+#   and the entry within it, so a single source of truth stays single:
+#     host    -> device-ref, resolves against the device/connection layer
+#                (credential store: connection.paths, multi-path priority)
+#     model   -> tier-ref, resolves against the model config layer (L2)
+#     channel -> chan-ref, resolves against the channel registration
+#     owner   -> agent-ref, must point at another agent in THIS registry
+#   Replacing a component of the ecosystem (e.g. GPG -> Vault, astra-sre ->
+#   own monitoring) changes only the resolution target, never this file.
+
+meta:
+  constellation: astra-agent-constellation
+  registry_version: 1.1.0
+  maintainer: alrcatraz
+
+agents:
+  - name: orchestrator-1
+    role: orchestrator
+    host: <HOST-1>            # device-ref: <HOST-N> placeholder in public copy
+    model: standard           # tier-ref -> model config layer (primary + fallback chain)
+    channel: <CHAN-0>         # chan-ref -> user-facing primary channel
+    owner: guardian-1         # agent-ref -> who maintains this agent
+    version: <semver>
+    patches: []
+    deploy_def: docs/07-adoption.md#phase-1   # doc-ref -> deployment definition
+    health_check:
+      type: port
+      target: <HOST-1>:<PORT-1>
+    restart:
+      ref: docs/06-gemini-pattern.md#6
+
+  - name: executor-dev
+    role: executor
+    host: <HOST-1>            # device-ref (same machine as orchestrator)
+    model: light              # tier-ref -> lighter model tier
+    owner: orchestrator-1     # agent-ref
+    version: <semver>
+    patches: []
+    deploy_def: docs/07-adoption.md#phase-1
+    health_check:
+      type: command
+      target: "opencode --version"
+    restart:
+      ref: docs/07-adoption.md#phase-1
+
+  - name: executor-build
+    role: executor
+    host: <HOST-2>            # device-ref (build machine, separate host)
+    model: standard           # tier-ref
+    owner: orchestrator-1     # agent-ref
+    version: <semver>
+    patches: []
+    deploy_def: docs/07-adoption.md#phase-2
+    health_check:
+      type: ssh
+      target: "<HOST-2>"
+    restart:
+      ref: docs/07-adoption.md#phase-2
+
+  - name: guardian-1
+    role: guardian
+    host: <HOST-3>            # device-ref (independent physical machine, ADR 0003)
+    model: light              # tier-ref (stable, independent upgrade track)
+    channel: <CHAN-1>         # chan-ref -> its own channel (06 §3)
+    owner: orchestrator-1     # agent-ref -> orchestrator maintains guardian (06 §8)
+    version: <semver>
+    patches: []
+    deploy_def: docs/06-gemini-pattern.md#5
+    health_check:
+      type: port
+      target: <HOST-3>:<PORT-2>
+    restart:
+      ref: docs/06-gemini-pattern.md#5

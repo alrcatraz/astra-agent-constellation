@@ -1,0 +1,119 @@
+# Task Brief — <TASK-NAME>
+
+> Copy to `tasks/<TASK-ID>-<task-name>.md` and adapt. This file is the
+> contract between the orchestrator and the executor for ONE task.
+> Written in British English. Normative keywords per RFC 2119.
+>
+> Validation-first principle (05 §3): the acceptance criteria are written
+> BEFORE the work starts, as exact commands with expected results. The
+> executor's self-reported "it passes" is NEVER the conclusion — the
+> orchestrator re-runs every command below.
+>
+> Stop-and-report principle (04 §2): when a chosen technical route fails,
+> the executor STOPS and reports back — it never silently switches to an
+> alternative route and keeps going. Same for out-of-scope discoveries.
+
+## Metadata
+
+| Field | Value |
+|:--|:--|
+| Task ID | `<TASK-ID>` (e.g. `task-042`) |
+| Brief version | `1.0` |
+| Orchestrator | `<agent-ref>` (resolves in the agent registry) |
+| Executor | `<agent-ref>` (resolves in the agent registry) |
+| Target repo | `<repo-ref>` (e.g. `astra-aigate`) |
+| Branch | `<branch-name>` (feature branch; never push it as the deliverable) |
+| Date issued | `<YYYY-MM-DD>` |
+| Date due | `<YYYY-MM-DD>` |
+
+## 1. Objective
+
+- One paragraph: WHAT this task delivers and WHY (design intent, not a
+  list of edits).
+
+## 2. Scope
+
+- **In scope**: `<areas the executor MAY touch — files, modules, layers>`.
+- **Out of scope**: `<areas the executor MUST NOT touch — keep explicit>`.
+- The orchestrator's git diff review (5.3) is judged against this scope
+  declaration.
+
+## 3. Stopping Conditions (MUST)
+
+The executor is headless — the orchestrator is not watching. These are the
+four situations where the executor MUST stop and report back instead of
+improvising. The report goes to the orchestrator and includes: where it is
+stuck, what was tried, the failure evidence, and the suggested way forward.
+
+- **MUST**: when the chosen technical route fails (missing API, dependency
+  conflict, design assumption falsified), STOP and report — do NOT silently
+  switch to an alternative route and keep going. Route changes are the
+  orchestrator's call.
+- **MUST**: when an acceptance command fails, STOP and report with the raw
+  output and a first-pass root-cause analysis — do NOT modify the command or
+  the expected result to manufacture a pass.
+- **MUST**: when an out-of-scope need surfaces (bug, side effect, pre-existing
+  debt), record it in the report and STOP — do NOT expand the change beyond
+  the scope declaration.
+- **MUST**: when required information, permission or resource is missing,
+  STOP and ask the orchestrator — do NOT fill the gap by guessing.
+- **SHOULD**: when the task will clearly overshoot its time/effort budget,
+  report progress and the revised estimate before continuing.
+
+## 4. Acceptance Criteria (MUST)
+
+Each criterion is an exact command and its expected result. The executor
+runs these during work; the orchestrator re-runs them after hand-off.
+
+| # | Command | Expected result |
+|:--|:--|:--|
+| 1 | `<exact command, e.g. npx tsc -p tsconfig.typecheck-core.json>` | `<exact expectation, e.g. zero NEW errors>` |
+| 2 | `<exact command, e.g. test runner invocation>` | `<exact expectation, e.g. 16/16 smoke tests pass>` |
+| 3 | `<exact command>` | `<exact expectation>` |
+
+- **MUST**: every acceptance criterion carries a verification command —
+  a criterion without a command is not an acceptance criterion.
+- **MUST**: expected results are objective (exit code, counts, output
+  strings), not subjective ("should work").
+- **SHOULD**: keep the command set minimal — one command per aspect.
+
+## 5. Hand-off Protocol
+
+### 5.1 Deliverables
+
+- `<deliverable 1 — file paths, commit hashes, service endpoints>`.
+- `<deliverable 2>`.
+- The decision record (5.2) accompanies the deliverables, never replaces
+  the diff.
+
+### 5.2 Decision record (MUST)
+
+The executor appends a decision record to the task report: what changed,
+why, which alternatives were considered, and why they were rejected.
+The orchestrator reviews it for consistency with this brief's scope.
+Any stopping-condition event (section 3) and its resolution MUST also be
+recorded here — a silent route change is indistinguishable from an
+undocumented decision.
+
+### 5.3 Orchestrator verification (MUST)
+
+1. Re-run every command in section 4 — the executor's self-report is
+   informational only.
+2. `git diff` review against the scope declaration in section 2.
+3. Session record (JSONL) kept in the project directory, retrievable on
+   demand (05 §5). MUST NOT contain credential values — secrets enter only
+   via environment variables and are never logged.
+
+## 6. Definition of Done
+
+The task is complete ONLY when ALL of the following hold:
+
+- [ ] All acceptance criteria in section 4 pass under the orchestrator's
+      re-run, not just the executor's run.
+- [ ] `git diff` matches the declared scope; nothing out-of-scope changed.
+- [ ] Decision record delivered and consistent with the brief; all
+      stopping-condition events documented with their resolutions.
+- [ ] No placeholder comments ("XXX removed"), no orphan TODOs, comments
+      explain WHY (AGENTS.md code hygiene).
+- [ ] Branch state recorded for the deliverable push (development branch,
+      dual remote) — the feature branch itself is never the deliverable.
