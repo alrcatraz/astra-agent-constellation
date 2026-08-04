@@ -30,7 +30,7 @@ REF_FIELDS = (
 OWNER_FIELD = "owner"    # agent-ref -> must resolve to a name in this registry
 
 
-def main(path: str) -> int:
+def main(path: str, private: bool = False) -> int:
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
 
@@ -51,16 +51,18 @@ def main(path: str) -> int:
             errors.append(f"agent[{i}] unknown role: {role!r} (expected one of {KNOWN_ROLES})")
         host = agent.get("host", "")
         # Sanitisation gate: public copies MUST use <PLACEHOLDER> hosts.
-        if not PLACEHOLDER_RE.match(host):
+        # Private copies (--private) hold real hostnames and skip this gate.
+        if not private and not PLACEHOLDER_RE.match(host):
             errors.append(f"agent[{i}] host {host!r} is not a sanitised placeholder "
-                          "(public copy must use <HOST-N>)")
+                          "(public copy must use <HOST-N>; run with --private for a "
+                          "private copy)")
 
         # Reference fields: validate format when present.
         for field, must_placeholder in REF_FIELDS:
             if field not in agent:
                 continue
             value = agent[field]
-            if must_placeholder and not PLACEHOLDER_RE.match(str(value)):
+            if not private and must_placeholder and not PLACEHOLDER_RE.match(str(value)):
                 errors.append(f"agent[{i}] {field} {value!r} must be a sanitised "
                               f"placeholder in the public copy (e.g. <CHAN-N>)")
 
@@ -79,12 +81,16 @@ def main(path: str) -> int:
             print(f"  - {err}")
         return 1
 
-    print("VALID: all agents pass the registry schema")
+    mode = "private copy (sanitisation gate skipped)" if private else "public copy"
+    print(f"VALID: all agents pass the registry schema ({mode})")
     return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"usage: {sys.argv[0]} <registry.yaml>")
+    args = sys.argv[1:]
+    private = "--private" in args
+    args = [a for a in args if a != "--private"]
+    if len(args) != 1:
+        print(f"usage: {sys.argv[0]} [--private] <registry.yaml>")
         sys.exit(2)
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(args[0], private=private))
