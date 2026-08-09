@@ -21,6 +21,7 @@
 - [x] 编排者运行手册 skill git 化 + 英文化（skills/astra-agent-constellation/，符号链接挂载，02 章 L3 合规）— 2026-08-04
 - [x] 真实注册表实例（agent-registry/registry.yaml，私有副本：angelia/executor-hc01/tyche 三 agent；tyche 未部署登记 version: uninstalled）— 2026-08-05
 - [x] registry-check.py 增加 `--private` 开关（私有副本跳过脱敏门禁，公开模板照旧拦截）+ 06 §5.1 模型档位说明 — 2026-08-05
+- [x] 工具门禁（astra-aigate）消费端接入部署 + 验证 — 2026-08-06：AIGate PG 模式运行（v0.4.3），三个 MCP 工具（markitdown / pageindex / astra-kb）经门禁端点消费，消费端三连验证（initialize 握手 + 会话 + tools/list）通过；camofox / SearXNG 为辅助服务监控层（/api/svc），健康检测完善中。03 §3.4.1 升级为「已部署实现」+ ADR 0006 记录验证方法。
 
 ## 进行中 / 已规划
 

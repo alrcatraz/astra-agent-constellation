@@ -109,11 +109,14 @@ audit: true                      # 必开：所有调用进审计日志（见 05
 
 ### 3.4.1 实现指向与审计落点
 
-本契约是**规范**，实际部署时挂到具体门禁实现：
+本契约是**规范**，当前已挂到具体门禁实现：
 
-- **参考实现**：astra-aigate（MCP 网关，多端点 non-merged-pool 架构）——其 `mcp_servers` 配置（kind=builtin|stdio|http、endpoint、scopes、预置 aigate-* 条目可禁不可删、旧端点 301）与本节契约对齐；鉴权 = API Key + scopes（方案 A），第三方 key 加密存 `auth_secret`。
+- **已部署实现（2026-08-06 状态）**：astra-aigate（MCP 网关 + 辅助服务反代，多端点 non-merged-pool 架构）——其 `mcp_servers` 配置（kind=builtin|stdio|http、endpoint、scopes、预置 aigate-* 条目可禁不可删、旧端点 301）与本节契约对齐；鉴权 = API Key + scopes（方案 A），第三方 key 加密存 `auth_secret`。部署形态分两层：
+  - **MCP 端点层**：工具经 `/api/mcp/servers/[id]/{sse,stream}` 暴露为 MCP 端点，智能体以 MCP 协议消费。已接入工具（消费端验证通过）：markitdown、pageindex、astra-kb。
+  - **辅助服务监控层**：非 MCP 工具（如 camofox、SearXNG）经 `/api/svc/*` 反向代理暴露，门禁做健康监控与转发。该层健康检测完善中（服务容器已就位）。
+- **消费端接入验证方法**：stream 端点 initialize 握手 → 会话建立（`Mcp-Session-Id`）→ `tools/list` 实测专属工具暴露，确认鉴权、scope、会话三通（该方法是部署会话的实操验证路径，由编排者执行，不涉及蓝图 ADR）。
 - **审计落点**：门禁审计事件按 05 §5.2 格式（`ts/agent/service/scope/action/result/ref`）写入门禁日志存储；智能体侧会话按 05 §5.1 记 JSONL。两个落点分离：门禁日志 = 操作事实（谁调了什么），会话记录 = 思考过程（为什么调）——不得混写。
-- **部署时机**：门禁本身也是工具服务，按 03 §6「新增工具服务的流程」注册进注册表后启用；未部署门禁期间，智能体直连工具服务是 03 §5 降级路径，需在注册表 `deploy_def` 中声明。
+- **部署时机**：门禁本身也是工具服务，按 03 §6「新增工具服务的流程」注册进注册表后启用；未部署门禁期间，智能体直连工具服务是 03 §5 降级路径，需在注册表 `deploy_def` 中声明。当前已过降级期——共享工具经门禁消费，本地配置只留门禁钥匙引用。
 
 ## 4. 凭证层
 
