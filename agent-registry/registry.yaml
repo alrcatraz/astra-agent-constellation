@@ -47,7 +47,7 @@ agents:
     host: HomeCentre01            # device-ref (same machine as orchestrator)
     model: light                  # tier-ref -> lighter cost/speed tier
     owner: angelia                # agent-ref
-    version: uninstalled          # opencode NOT deployed — deferred until AIGate done
+    version: 1.18.15              # opencode, official installer (~/.opencode/bin/opencode)
     patches: []
     deploy_def: docs/07-adoption.md#phase-1
     health_check:
@@ -55,6 +55,20 @@ agents:
       target: "opencode --version"
     restart:
       ref: docs/07-adoption.md#phase-1
+
+  - name: executor-susetlearn00
+    role: executor
+    host: SUSETLearn00            # device-ref (build machine, SSH 2222)
+    model: light                  # tier-ref -> lighter cost/speed tier
+    owner: angelia                # agent-ref
+    version: 1.18.15              # opencode, official installer (~/.opencode/bin/opencode)
+    patches: []
+    deploy_def: docs/07-adoption.md#phase-2
+    health_check:
+      type: command
+      target: "opencode --version"
+    restart:
+      ref: docs/07-adoption.md#phase-2
 
   # guardian — tyche: deferred (no carrier device, PLAN.md).
   # Blueprint requires an independent physical machine (ADR 0003, fault-domain
