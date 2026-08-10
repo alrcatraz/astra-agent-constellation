@@ -115,6 +115,8 @@ audit: true                      # 必开：所有调用进审计日志（见 05
   - **MCP 端点层**：工具经 `/api/mcp/servers/[id]/{sse,stream}` 暴露为 MCP 端点，智能体以 MCP 协议消费。已接入工具（消费端验证通过）：markitdown、pageindex、astra-kb。
   - **辅助服务监控层**：非 MCP 工具（如 camofox、SearXNG）经 `/api/svc/*` 反向代理暴露，门禁做健康监控与转发。该层健康检测完善中（服务容器已就位）。
 - **消费端接入验证方法**：stream 端点 initialize 握手 → 会话建立（`Mcp-Session-Id`）→ `tools/list` 实测专属工具暴露，确认鉴权、scope、会话三通（该方法是部署会话的实操验证路径，由编排者执行，不涉及蓝图 ADR）。
+- **执行者侧接入（2026-08-10）**：两个位置化执行者（OpenCode）实例均接入同一门禁消费共享 MCP 服务——markitdown / pageindex / astra-kb（经 `/api/mcp/servers/<id>/stream` + 各自 API key，OpenCode `type: remote` MCP 配置），并各装本地开发实用工具 codegraph（`codegraph serve --mcp` 本地 MCP）+ graphlint（CLI + prompt 注入 `~/.config/opencode/AGENTS.md`）。无头 CLI 下 skill/MCP 工具需在 permission 放行（`skill: allow`、工具前缀 allow），否则自动拒绝。跨机执行者经网桥域名访问门禁实测可用；**跨机文件路径边界**：门禁侧 MCP 工具解析本地路径，远程执行者的本地文件需以 data URI 或门禁侧路径传入（非故障，架构特性）。
+- **执行者技能导入**：执行者技能经同一门禁的 Skill Hub 从外部源导入（编排者用自己的 key：`sources` → `discover` → `install` → `artifacts` → `?format=agent-plugin` + sha256 校验 → 规范化落位 `~/.config/opencode/skills/<name>/`）；技能加载并执行可用。详细流程见运行手册 skill「Importing skills from outside」小节。
 - **审计落点**：门禁审计事件按 05 §5.2 格式（`ts/agent/service/scope/action/result/ref`）写入门禁日志存储；智能体侧会话按 05 §5.1 记 JSONL。两个落点分离：门禁日志 = 操作事实（谁调了什么），会话记录 = 思考过程（为什么调）——不得混写。
 - **部署时机**：门禁本身也是工具服务，按 03 §6「新增工具服务的流程」注册进注册表后启用；未部署门禁期间，智能体直连工具服务是 03 §5 降级路径，需在注册表 `deploy_def` 中声明。当前已过降级期——共享工具经门禁消费，本地配置只留门禁钥匙引用。
 
