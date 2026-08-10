@@ -13,6 +13,10 @@
 - [x] ⑥ 审计日志格式 — docs/05 §5.1/§5.2
 - [x] ⑦ 卷二英文卷（templates/ 全英文化合规）— 2026-08-04
 - [x] 0.1.0 发布（4 贡献 commit 重建 + gitea 私有仓 + v0.1.0 签名 tag）— 2026-08-04
+- [x] 执行者 MCP 接入（2026-08-10）— 双执行者（executor-hc01 / executor-susetlearn00）接入统一网关（AIGate）的共享 MCP 服务：**markitdown / pageindex / astra-kb** 经网关 stream 端点（`/api/mcp/servers/<id>/stream` + 各自 API key），**codegraph / graphlint** 为本地开发实用工具（codegraph = OpenCode 本地 MCP `codegraph serve --mcp`；graphlint = CLI + prompt 注入 `~/.config/opencode/AGENTS.md`，双机均装）。skill 工具在无头 CLI 下需 `permission.skill: allow`（否则自动拒）。双机 opencode 权限放行 MCP/skill 工具后实测可用（HC01 本地 + SUSETLearn00 跨机经 netbird 域名各调通 markitdown/pageindex/astra-kb/codegraph）。
+- [x] 执行者技能接入（2026-08-10）— 按「执行者 = 开发调试主体、对等通用技能基座」原则：两个执行者均装 **development-skills 全 7**（c-/csharp-/gdscript-/python-programming、coding-workflow、systematic-debugging、toolchain）+ **astra-vcs-assist 全 8**（主 + github/gpg/git-dev/fork/init/release/sync），落地 `~/.config/opencode/skills/<name>/SKILL.md`；SUSETLearn00 作为 Godot 开发机**额外**挂 godot-agentic + godot-marl-dev。技能经 OpenCode `skill` 工具真实加载验证（从技能内容给出规范建议，非模型默认）。
+- [x] 技能导入流程验证 + skill 落地（2026-08-10）— 编排者**用自己的 key** 经 AIGate Skill Hub 从外部导入技能的端到端链路跑通：`GET /api/skills/sources`（源清单 8 个）→ `GET /api/skills/sources/<id>/discover`（技能 meta：sourceUrl/commitSha/externalId）→ `POST /api/skills/sources/<id>/install`（注册进 skillRegistry，返回 id）→ `GET /api/skills/artifacts`（消费清单）→ `GET /api/skills/artifacts/<id>?format=agent-plugin`（拉 SKILL.md 包 + sha256 校验）→ 规范化落位。**AIGate 侧 2 缺口待修**（报部署会话）：`gitRepoAdapter` 嵌套技能（如 `git/skills/`）fetch 路径丢中间层（discover 能列但 install ENOENT）；无「整源 tarball 下发接口」（artifacts 只给单技能，无法交整项目给消费方分析附属文件）。7 个 astra-vcs-assist 子技能因此暂从本地源仓库取（内容与 sourceUrl 仓库 commitSha 一致）。运行手册 skill 新增「Importing skills from outside」小节并标记 Verified。
+- [x] Godot 开发机部署（2026-08-10）— godot-agentic-toolkits 技能部署至 SUSETLearn00 执行者（OpenCode skills 目录，含 references），executor-susetlearn00 可加载使用；godot-mcp + Godot 引擎已在机。多智能体架构指定 Godot 项目由 SUSETLearn00 开发、该 repo 工具部署于该机并由 executor-susetlearn00 访问（AIGate 已登记该源）。
 
 ## 进行中 / 已规划
 

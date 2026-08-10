@@ -94,6 +94,47 @@ by the orchestrator takes priority.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
 
+### 6. Importing skills from outside (via AI Gate)
+
+When a new skill must be introduced from outside the constellation, the
+orchestrator imports it **through AI Gate's Skill Hub** — AI Gate is the
+registry and provisioning source, the orchestrator is the installation
+decision-maker. AI Gate never writes into any agent's skill directory
+(03 §3.4.1): it only produces bytes; the consumer resolves and installs
+them. **Verified end-to-end 2026-08-10** (godot-agentic served as the first
+real import — no design fiction).
+
+The orchestrator's own skill is held in the constellation blueprint repo;
+skills for the executors are provisioned via this flow. A skill that is an
+annex of a service / MCP MUST bring in that service / MCP for the target
+agent(s) too.
+
+Flow (steps 1–2 are source analysis, 3–5 are the actual install):
+
+1. **Discover the source catalogue**: `GET /api/skills/sources` returns the
+   registered sources (8 as of 2026-08-10: 5 gitea-private + 3
+   github-public, incl. `godot-agentic-toolkits`). Per source,
+   `GET /api/skills/sources/<id>/discover` returns every skill with
+   `sourceUrl`, `commitSha`, `externalId`, `artifact`, `ref` — the analyse
+   input before any install.
+2. **Register the skill into AI Gate** (prerequisite so it appears in the
+   consumable catalogue): `POST /api/skills/sources/<id>/install` with
+   `{name, version, description, externalId}` → returns `{success, id}`.
+   The orchestrator's own key has the required scope — no management token.
+3. **List the consumable catalogue**: `GET /api/skills/artifacts` → the
+   installed skills (id, name, version, sourceKind, sourceRef, externalId,
+   artifact; `formats: ["agent-plugin", "tarball"]`).
+4. **Fetch a skill as bytes**:
+   `GET /api/skills/artifacts/<id>?format=agent-plugin` (or `tarball`) →
+   agent-plugin is a text bundle (`---FILE plugin.json---` +
+   `---FILE skills/<name>/SKILL.md---` sections). Verify
+   `X-Artifact-Sha256` against the downloaded bytes before use.
+5. **Analyse then install**: is the skill self-contained, or an annex of a
+   service / MCP? Decide the target (orchestrator `~/.hermes/skills`, or an
+   executor's `~/.config/opencode/skills/<name>/SKILL.md`) and normalise.
+6. **Re-verify**: load the skill on the target (e.g. have the executor list
+   its available skills), confirm references/scripts resolve.
+
 ## Blueprint spec repo maintenance (secondary function)
 
 - **Language split**: `docs/` + README = Simplified Chinese (RFC 2119
