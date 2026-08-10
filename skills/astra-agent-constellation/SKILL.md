@@ -94,6 +94,40 @@ by the orchestrator takes priority.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
 
+### 6. Importing skills from outside (via the tool gate's Skill Hub)
+
+When a new skill must be introduced from outside the constellation, the
+orchestrator imports it through the tool gate's Skill Hub — the gate is the
+registry and provisioning source, the orchestrator is the installation
+decision-maker. The gate never writes into any agent's skill directory (03
+§3.4.1): it only produces bytes; the consumer resolves and installs them.
+A skill that is an annex of a service / MCP MUST bring in that service / MCP
+for the target agent(s) too.
+
+Flow:
+
+1. **Discover the source catalogue**: list the registered sources
+   (`GET /api/skills/sources`); per source, `discover` returns every skill
+   with `sourceUrl`, `commitSha`, `externalId`, `artifact`, `ref` — the
+   analysis input before any install.
+2. **Register the skill into the gate** (prerequisite so it appears in the
+   consumable catalogue): `POST /api/skills/sources/<id>/install` with
+   `{name, version, description, externalId}` → returns `{success, id}`.
+   The orchestrator's own API key holds the required scope.
+3. **List the consumable catalogue**: `GET /api/skills/artifacts` → the
+   installed skills (id, name, version, sourceKind, externalId, artifact;
+   `formats: ["agent-plugin", "tarball"]`).
+4. **Fetch a skill as bytes**:
+   `GET /api/skills/artifacts/<id>?format=agent-plugin` (or `tarball`) —
+   agent-plugin is a text bundle (`---FILE plugin.json---` +
+   `---FILE skills/<name>/SKILL.md---` sections). Verify the artifact
+   `sha256` header against the downloaded bytes before use.
+5. **Analyse then install**: is the skill self-contained, or an annex of a
+   service / MCP? Decide the target (an agent's skill directory) and
+   normalise into it.
+6. **Re-verify**: load the skill on the target (e.g. have the agent list or
+   exercise it), confirm references/scripts resolve.
+
 ## Blueprint spec repo maintenance (secondary function)
 
 - **Language split**: `docs/` + README = Simplified Chinese (RFC 2119
