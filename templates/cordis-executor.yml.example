@@ -4,6 +4,11 @@
 # all kept) + capability groups added for full development load.
 # LLM: AIGate (OpenAI-compatible gateway) via llm-pi-ai hand-declared route.
 # Transport: ACP server (stdio) — driven by the orchestrator (Hermes).
+#
+# Executor key: each machine holds its OWN AIGATE_EXECUTOR_KEY in
+# ~/Projects/dsh/.env (gitignored; dsh loadEnv() reads it at boot).
+# This file only references the env var name — never a literal key.
+# The deploy tar excludes .env; create it per host after extraction.
 
 # ---- LLM: AIGate via pi-ai (replaces llm-deepseek) ----
 - id: llm
