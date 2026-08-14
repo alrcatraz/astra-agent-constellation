@@ -52,17 +52,68 @@ Discipline: short tasks MUST NOT be delegated to an executor; long tasks MUST
 NOT be tackled solo; when in doubt and the user is present, direct execution
 by the orchestrator takes priority.
 
-### 2. Invoking the executor (OpenCode)
+### 2. Invoking the executor (OpenCode, via ACP)
 
 - When splitting a task, generate a task brief (copy
   `templates/task-brief/task-brief.md.example` →
   `tasks/<ID>-<name>.md`): Metadata (agent-ref resolved via the registry) +
   Objective + Scope (including out-of-scope) + 5 Stopping Conditions +
   Acceptance Criteria (commands with expected results) + Hand-off + DoD.
-- Same machine: `opencode run "..." --continue --format json`; remote
-  machine: ssh to the build host.
-- Executor permission hard locks are already configured in opencode.json
-  (push deny, commit ask, env deny).
+- **Preferred: ACP dispatch (verified 2026-08-14)** — Hermes' native
+  `copilot-acp` provider drives the executor over the Agent Client
+  Protocol. Configure once per executor host (env vars, or
+  `providers.copilot-acp` in config.yaml if the schema supports command/args):
+  ```bash
+  export HERMES_COPILOT_ACP_COMMAND="ssh"
+  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> opencode acp --cwd <WORKDIR> --pure"
+  # then delegate with:
+  #   hermes chat --provider copilot-acp --model copilot-acp -q "<brief>"
+  # or via delegate_task with the provider configured on the agent.
+  ```
+  Full-chain verified end-to-end: Hermes → CopilotACPClient (native ACP
+  client) → SSH stdio passthrough → remote `opencode acp` → reply. Task-brief
+  content maps to ACP content blocks per blueprint 10 (Metadata → `_meta`,
+  body → text blocks, AGENTS.md → resource_link, acceptance → per-command
+  blocks). Client MUST consume the `session/update` notification stream —
+  reply body arrives as `agent_message_chunk`, RESP is only the end marker.
+- **dsh executor (DeepSeek Harness, verified 2026-08-14)** — same ACP dispatch,
+  different server command:
+  ```bash
+  export HERMES_COPILOT_ACP_COMMAND="ssh"
+  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> \"cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml\""
+  ```
+  dsh replaces OpenCode for new deployments (sandbox write-wall has no
+  headless ask-hang; 36-tool set incl. LSP/subagents/terminal; MCP tool naming
+  `mcp__<server>__<tool>` matches Hermes). Deployment/config manual:
+  `dsh-executor-deployment` skill. Both executors emit `session/update`
+  chunks + committed RESP — the client-side handling is identical.
+- **Fallback: `opencode run`** (pre-ACP, still works): same machine
+  `opencode run "..." --continue --format json`; remote machine: ssh to the
+  build host.
+- Executor permission hard locks are configured in opencode.json (see the
+  `opencode-executor-deployment` skill §4): `edit`/`todowrite` are `allow`
+  (the executor's job IS writing code); `git push`/`git commit`/`sudo`/`rm -rf`
+  are `deny` (git lifecycle belongs ENTIRELY to the orchestrator — commit/push/
+  stage are the orchestrator's, never the executor's); `read_env` deny;
+  `external_directory` ask. So: (a) the executor writes code & runs tests freely,
+  (b) it CANNOT touch git history, (c) it cannot read fork-external configs/secrets.
+- **Dispatch contract for a headless-capable run** — before sending an executor
+  task, verify these are true:
+  - any file the executor must read (task brief) is INSIDE its workdir — a brief
+    stored in the constellation repo is unreachable (`external_directory: ask`
+    auto-rejects headlessly). Copy it in as a git-ignored `.task-brief.md`.
+  - **Prefer a git-ignored, local-tracking AGENTS.md beside the brief** over a
+    long prompt (user guidance 2026-08-10: "配合 PLAN.md、AGENTS.md(仅本地追踪版)
+    等工具帮助你，不一定全要靠 prompt"). OpenCode loads a project `AGENTS.md` as
+    its instruction layer automatically, so it is the right home for durable
+    executor discipline — tool set (simple: read/write/edit/glob/grep/todo/bash),
+    command-shape rules (one simple command per step, no pipes/&&/redirects —
+    pitfall #14), env setup, language-specific implementation pointers. Keep the
+    dispatch prompt minimal ("read AGENTS.md + brief, execute"; "on a permission
+    wall STOP and report the exact tool name"). Remember to add `AGENTS.md` to
+    `.gitignore` so it never leaks into a commit.
+  - git operations are entirely absent from the executor's brief (commit/push are
+    hard-denied; the orchestrator does all of it).
 
 ### 3. Invoking the guardian (indirect — no live channel)
 
@@ -94,39 +145,46 @@ by the orchestrator takes priority.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
 
-### 6. Importing skills from outside (via the tool gate's Skill Hub)
+### 6. Importing skills from outside (via AI Gate)
 
 When a new skill must be introduced from outside the constellation, the
-orchestrator imports it through the tool gate's Skill Hub — the gate is the
+orchestrator imports it **through AI Gate's Skill Hub** — AI Gate is the
 registry and provisioning source, the orchestrator is the installation
-decision-maker. The gate never writes into any agent's skill directory (03
-§3.4.1): it only produces bytes; the consumer resolves and installs them.
-A skill that is an annex of a service / MCP MUST bring in that service / MCP
-for the target agent(s) too.
+decision-maker. AI Gate never writes into any agent's skill directory
+(03 §3.4.1): it only produces bytes; the consumer resolves and installs
+them. **Verified end-to-end 2026-08-10** (godot-agentic served as the first
+real import — no design fiction).
 
-Flow:
+The orchestrator's own skill is held in the constellation blueprint repo;
+skills for the executors are provisioned via this flow. A skill that is an
+annex of a service / MCP MUST bring in that service / MCP for the target
+agent(s) too.
 
-1. **Discover the source catalogue**: list the registered sources
-   (`GET /api/skills/sources`); per source, `discover` returns every skill
-   with `sourceUrl`, `commitSha`, `externalId`, `artifact`, `ref` — the
-   analysis input before any install.
-2. **Register the skill into the gate** (prerequisite so it appears in the
+Flow (steps 1–2 are source analysis, 3–5 are the actual install):
+
+1. **Discover the source catalogue**: `GET /api/skills/sources` returns the
+   registered sources (8 as of 2026-08-10: 5 gitea-private + 3
+   github-public, incl. `godot-agentic-toolkits`). Per source,
+   `GET /api/skills/sources/<id>/discover` returns every skill with
+   `sourceUrl`, `commitSha`, `externalId`, `artifact`, `ref` — the analyse
+   input before any install.
+2. **Register the skill into AI Gate** (prerequisite so it appears in the
    consumable catalogue): `POST /api/skills/sources/<id>/install` with
    `{name, version, description, externalId}` → returns `{success, id}`.
-   The orchestrator's own API key holds the required scope.
+   The orchestrator's own key has the required scope — no management token.
 3. **List the consumable catalogue**: `GET /api/skills/artifacts` → the
-   installed skills (id, name, version, sourceKind, externalId, artifact;
-   `formats: ["agent-plugin", "tarball"]`).
+   installed skills (id, name, version, sourceKind, sourceRef, externalId,
+   artifact; `formats: ["agent-plugin", "tarball"]`).
 4. **Fetch a skill as bytes**:
-   `GET /api/skills/artifacts/<id>?format=agent-plugin` (or `tarball`) —
+   `GET /api/skills/artifacts/<id>?format=agent-plugin` (or `tarball`) →
    agent-plugin is a text bundle (`---FILE plugin.json---` +
-   `---FILE skills/<name>/SKILL.md---` sections). Verify the artifact
-   `sha256` header against the downloaded bytes before use.
+   `---FILE skills/<name>/SKILL.md---` sections). Verify
+   `X-Artifact-Sha256` against the downloaded bytes before use.
 5. **Analyse then install**: is the skill self-contained, or an annex of a
-   service / MCP? Decide the target (an agent's skill directory) and
-   normalise into it.
-6. **Re-verify**: load the skill on the target (e.g. have the agent list or
-   exercise it), confirm references/scripts resolve.
+   service / MCP? Decide the target (orchestrator `~/.hermes/skills`, or an
+   executor's `~/.config/opencode/skills/<name>/SKILL.md`) and normalise.
+6. **Re-verify**: load the skill on the target (e.g. have the executor list
+   its available skills), confirm references/scripts resolve.
 
 ## Blueprint spec repo maintenance (secondary function)
 
@@ -177,6 +235,16 @@ Flow:
 - External links from docs/ to the meta-repo (e.g. Reference Protocol →
   astra-aiagent-infra) are URL form — hash rewrites do not affect them, but
   broken paths must be fixed.
+- **Executor permission model (verified 2026-08-10)**: the OpenCode executor
+  runs headless (background, no interaction), so any `ask`-gated permission
+  is auto-rejected. `read` is `allow` ONLY inside the executor's workdir;
+  a path outside it hits `external_directory: ask` → auto-rejected. A task
+  brief stored in the constellation repo (`~/Projects/astra/...`) is therefore
+  NOT readable by the executor. Fix: copy the brief into the target repo
+  (workdir) as a git-ignored file (e.g. `.task-brief.md`, append to
+  `.gitignore`), point the executor at it, and clean it up after acceptance.
+  Do NOT loosen opencode.json permissions for this — it is a global executor
+  config change with broad blast radius.
 - Dark-mode rendering: table headers/zebra/admonition colours derive from
   tokens.css variables — never hardcode component colours outside tokens.css.
 - 06 §5 registry fields: use the reference protocol

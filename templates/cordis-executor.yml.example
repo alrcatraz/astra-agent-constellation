@@ -1,0 +1,288 @@
+# Executor-edition DSH (astra constellation) — cordis.yml
+#
+# Based on the official examples/acp-agent/cordis.yml blueprint (18 plugins,
+# all kept) + capability groups added for full development load.
+# LLM: AIGate (OpenAI-compatible gateway) via llm-pi-ai hand-declared route.
+# Transport: ACP server (stdio) — driven by the orchestrator (Hermes).
+
+# ---- LLM: AIGate via pi-ai (replaces llm-deepseek) ----
+- id: llm
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      aigate:
+        displayName: Astra AI Gate
+        apiKeyEnv: AIGATE_EXECUTOR_KEY
+        api: openai-completions
+        baseURL: http://<GATE_HOST>:20128/v1
+        models:
+          - id: auto/coding
+            name: AIGate coding
+            contextWindow: 65536
+          - id: auto/cheap
+            name: AIGate cheap
+            contextWindow: 32768
+
+# ---- Sandbox (permission boundary) ----
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js process.cwd()
+
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+
+- id: bash
+  name: '@deepseek-ai/dsh-bash-sandbox'
+  config:
+    timeoutMs: 60000
+
+- id: approval
+  name: '@deepseek-ai/dsh-user-approval'
+  config:
+    policy: ask
+
+# ---- ACP automation app (agent spine + persistence + ACP bridge) ----
+- id: acp-agent
+  name: '@deepseek-ai/dsh-acp-demo'
+  config:
+    provider: aigate
+    model: auto/coding
+    persistenceRoot: !!js "process.env.DSH_SESSIONS_ROOT ?? './.sessions'"
+    persistenceCompression: zstd
+    workspaceContext:
+      maxBytes: 65536
+    persona: |
+      You are a coding executor powered by the {{model}} model. Your working
+      directory is {{cwd}}. Your bash tool runs under a file sandbox — a
+      `[sandbox: file access denied …]` result is policy, not a command bug.
+
+      You are the executor: write, test, debug code. Nothing else.
+      NEVER run git write operations (commit/push/rebase/reset/checkout).
+      Verify your work by running the code or tests. Keep answers brief
+      and factual. On a permission wall, STOP and report the exact tool name.
+
+# ---- Context management ----
+- id: token-meter
+  name: '@deepseek-ai/dsh-token-meter'
+
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    thresholdRatio: 0.8
+    retainRatio: 0.08
+    maxTokens: 8192
+    compactionRetries: 1
+
+# ---- Subagents (parallel subtasks) ----
+- id: session-projection
+  name: '@deepseek-ai/dsh-session-projection'
+
+- id: subagent
+  name: '@deepseek-ai/dsh-subagent'
+
+- id: subagent-spawn-in-process
+  name: '@deepseek-ai/dsh-subagent-spawn-in-process'
+  config:
+    providerName: spawn
+
+- id: subagent-fork-in-process
+  name: '@deepseek-ai/dsh-subagent-fork-in-process'
+  config:
+    providerName: fork
+
+- id: tool-subagent-control
+  name: '@deepseek-ai/dsh-tool-subagent-control'
+
+- id: tool-subagent-list-agents
+  name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+- id: tool-subagent-report
+  name: '@deepseek-ai/dsh-tool-subagent-report'
+
+- id: tool-subagent
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: subagent
+    backgroundMode: continuable
+    maxDepth: 1
+
+- id: tool-subagent-fork
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: fork
+    toolName: subagent_fork
+    backgroundMode: one-shot
+    enableRunInBackground: false
+    maxDepth: 1
+
+# ---- Workflows ----
+- id: workflow-worker-thread
+  name: '@deepseek-ai/dsh-workflow-worker-thread'
+  config:
+    provider: spawn
+
+- id: tool-workflow
+  name: '@deepseek-ai/dsh-tool-workflow'
+
+- id: tool-ralph
+  name: '@deepseek-ai/dsh-tool-ralph'
+
+# ---- Task tracking ----
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+- id: repeat-tool-reminder
+  name: '@deepseek-ai/dsh-repeat-tool-reminder'
+
+# ---- Filesystem (sandboxed, read-before-edit) ----
+- id: fs-sandbox
+  name: '@deepseek-ai/dsh-fs-sandbox'
+  config:
+    cwd: !!js process.cwd()
+
+- id: fs-observation-policy
+  name: '@deepseek-ai/dsh-fs-observation-policy'
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+# ---- Hooks (discipline) ----
+- id: hooks-claude-code
+  name: '@deepseek-ai/dsh-hooks-claude-code'
+  config:
+    configPath: ./hooks.json
+
+- id: hooks-codex
+  name: '@deepseek-ai/dsh-hooks-codex'
+  config:
+    configPath: ./codex-hooks.json
+
+# ================= ADDED CAPABILITIES (full dev load) =================
+
+# ---- MCP client: AIGate-gated tools (markitdown/pageindex/astra-kb) ----
+# Endpoint ids verified from AIGate /api/mcp/status (2026-08-14).
+- id: mcp-markitdown
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: markitdown
+    transport: streamable-http
+    url: http://<GATE_HOST>:20128/api/mcp/servers/markitdown/stream
+    headers:
+      Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
+    failOnStartupError: true
+
+- id: mcp-pageindex
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: pageindex
+    transport: streamable-http
+    url: http://<GATE_HOST>:20128/api/mcp/servers/pageindex/stream
+    headers:
+      Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
+    failOnStartupError: true
+
+- id: mcp-astra-kb
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: astra-kb
+    transport: streamable-http
+    url: http://<GATE_HOST>:20128/api/mcp/servers/astra-kb/stream
+    headers:
+      Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
+    failOnStartupError: true
+
+# ---- Skills (executor skill base: dev-skills + vcs-assist) ----
+- id: skill
+  name: '@deepseek-ai/dsh-skill'
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ---- LSP (language intelligence) ----
+- id: lsp
+  name: '@deepseek-ai/dsh-lsp'
+- id: lsp-stdio
+  name: '@deepseek-ai/dsh-lsp-stdio'
+  config:
+    servers:
+      clangd:
+        command: clangd
+        extensionToLanguage:
+          '.c': c
+          '.h': c
+          '.cpp': cpp
+          '.cc': cpp
+          '.cxx': cpp
+          '.hpp': cpp
+          '.hh': cpp
+          '.hxx': cpp
+      rust-analyzer:
+        command: rust-analyzer
+        extensionToLanguage:
+          '.rs': rust
+- id: tool-lsp
+  name: '@deepseek-ai/dsh-tool-lsp'
+
+# ---- Code search (ripgrep) ----
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: true
+
+# ---- Precise editor ----
+- id: str-replace-editor
+  name: '@deepseek-ai/dsh-tool-str-replace-editor'
+
+# ---- Code runtime (safe model-written program execution) ----
+- id: code-runtime
+  name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+
+# ---- Session memory (cross-session search) ----
+# NOTE: acp-demo already provides sessionQuery (SqliteSessionQueryEngine);
+# adding session-query-sqlite here causes a service-registration conflict.
+# The tool-session-query consumer is mounted by acp-agent's composition.
+- id: tool-session-query
+  name: '@deepseek-ai/dsh-tool-session-query'
+
+# ---- Background jobs ----
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+# ---- Web (docs/dependency lookup) ----
+- id: web
+  name: '@deepseek-ai/dsh-web'
+- id: web-search-deepseek
+  name: '@deepseek-ai/dsh-web-search-deepseek'
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+
+# ---- Interactive terminal (PTY, headless-optional) ----
+- id: terminal
+  name: '@deepseek-ai/dsh-terminal'
+- id: terminal-bash
+  name: '@deepseek-ai/dsh-terminal-bash'
+- id: tool-terminal
+  name: '@deepseek-ai/dsh-tool-terminal'
+
+# ---- Goals (installed, todo remains primary) ----
+- id: goal
+  name: '@deepseek-ai/dsh-goal'
+- id: plan-mode
+  name: '@deepseek-ai/dsh-plan-mode'
+  config:
+    section: |
+      You are in plan mode. Stay in plan mode until exit_plan_mode succeeds.
+      Imperative language to implement changes means plan the implementation,
+      not execute it. Explore first — use non-mutating reads, searches, and
+      static analysis to ground the plan in the actual repository. Do not
+      edit or write files, change configuration, or run formatters that
+      rewrite tracked files. Submit the plan through exit_plan_mode.
