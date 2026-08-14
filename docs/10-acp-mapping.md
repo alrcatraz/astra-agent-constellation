@@ -163,3 +163,21 @@ ACP 被 Hermes 原生 client 驱动，完整验证矩阵：
 沙箱写墙权限模型（无 headless ask 挂起）、36 工具集（LSP/子代理/终端/会话记忆）、
 MCP 工具命名与 Hermes 一致。部署/配置手册见 `dsh-executor-deployment` skill（与
 `opencode-executor-deployment` 对齐：安装、配置、AIGate 接入、权限、MCP、ACP、坑列表）。
+
+### dsh 生产落地（2026-08-15，v0.2.1）
+
+dsh 正式替换 OpenCode 成为生产执行者：
+
+- **编排侧**：Hermes 原生 `copilot-acp` provider 的启动命令持久化在
+  `~/.hermes/.env`（`HERMES_COPILOT_ACP_COMMAND` = `bash`、
+  `HERMES_COPILOT_ACP_ARGS` = `-c 'cd ~/Projects/dsh && node --import tsx
+  packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'`）。
+  源码确认 client 走 `os.getenv` 读取——env 文件即配置，无需 config.yaml 段。
+- **执行者 key 按机隔离**：各机 `AIGATE_EXECUTOR_KEY` 只存在于该机
+  `~/Projects/dsh/.env`（gitignored，dsh `loadEnv()` 启动时读取）。
+  cordis.yml 仅引用变量名（`apiKeyEnv: AIGATE_EXECUTOR_KEY`）。key 不进
+  部署 tar（`--exclude='dsh/.env'`）、不进仓库、不进 Hermes 环境——
+  编排者不持有执行者身份。
+- **严格验证（`env -u AIGATE_EXECUTOR_KEY` 模拟编排侧无 key）**：
+  本机 `DSH-STRICT-OK` ✅ / 远程 `REMOTE-DOTENV-OK` ✅。两机 key 哈希
+  前缀不同（隔离验证）。
