@@ -82,7 +82,7 @@ provider runtime accepts any command, so this is a drop-in config change.
 **dsh (DeepSeek Harness) is a verified alternative executor (2026-08-14):**
 `ssh -T -p <port> <build-host> "cd ~/Projects/dsh && node --import tsx
 packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml"` — full
-chain verified local (HC01) and remote (SUSETLearn00). dsh's sandbox
+chain verified local (dev host) and remote (build host). dsh's sandbox
 (workspace-write) has no headless ask-hang; recommended over OpenCode for
 new deployments. Deployment manual: `dsh-executor-deployment` skill.
 

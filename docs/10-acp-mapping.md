@@ -77,7 +77,7 @@ task-brief.md.example 模板保留为：① ACP 化之前当前实现形态的�
 | 05 审计 | `_meta` Task ID 打通 ACP 会话 ↔ 执行者 JSONL ↔ 门禁审计事件（05 §5.2 ref 关联） |
 | 04 纪律传导 | 停止条件/验收重跑/范围审查纪律不因传输升级而改变 |
 
-## 6. 验证记录（2026-08-14，OpenCode 1.18.15 双机实测：HC01 + SUSETLearn00）
+## 6. 验证记录（2026-08-14，OpenCode 1.18.15 双机实测：dev host + build host）
 
 **结论：OpenCode ACP server 模式完全可用，映射设计全部协议前提实测通过。**
 
@@ -113,7 +113,7 @@ export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> opencode acp --cwd <WORK
 hermes chat --provider copilot-acp --model copilot-acp -q "<task>"
 ```
 
-**完整链路实测通过**（SUSETLearn00 远程）：
+**完整链路实测通过**（build host 远程）：
 `Hermes chat --provider copilot-acp` → `CopilotACPClient`（原生 client，spawn
 `ssh`）→ SSH stdio 透传 → 远程 `opencode acp` → 模型回复（9s，0 工具调用）。
 Hermes 内部路径：`agent.acp_command` ← `runtime.get("command")` ←
@@ -143,21 +143,21 @@ Hermes 内部路径：`agent.acp_command` ← `runtime.get("command")` ←
 
 **适配规则**：执行者 promptCapabilities 无 embeddedContext 时，AGENTS.md 指令层退回「text block 内联」或「URI 文本引用」；dsh 沙箱写墙（workspace-write）自动拒绝 workdir 外写入并返回清晰错误——**无 OpenCode 的 headless ask 挂起问题**，workdir 外读取也自由（读参考材料无需应答）；MCP 工具命名与 Hermes 一致（`mcp__<server>__<tool>`），规则复用无需改名。
 
-### dsh 执行者版实测记录（2026-08-14，HC01 + SUSETLearn00）
+### dsh 执行者版实测记录（2026-08-14，dev host + build host）
 
 dsh（DeepSeek Harness，29 插件执行者组合，`~/Projects/dsh/executor/cordis.yml`）经
 ACP 被 Hermes 原生 client 驱动，完整验证矩阵：
 
 | 验证项 | 结果 |
 |:--|:--|
-| 安装 + 29 插件配置 | ✅ clone + pnpm install + build；远程（SUSETLearn00）全量 tar 同步 |
+| 安装 + 29 插件配置 | ✅ clone + pnpm install + build；远程（build host）全量 tar 同步 |
 | AIGate 接入 | ✅ `model='aigate/auto/coding'`，llm-pi-ai hand-declared route（配置非代码） |
-| ACP server（Hermes 直连，HC01） | ✅ `DSH-EXECUTOR-OK` |
+| ACP server（Hermes 直连，dev host） | ✅ `DSH-EXECUTOR-OK` |
 | 工具调用（fs + bash） | ✅ 真实写文件 + 执行命令 + 结果报告 |
 | MCP 门禁（AIGate 工具） | ✅ `mcp__pageindex__get_structure` 真实调用成功 |
 | 权限模型 | ✅ workspace-write：读自由 + 写 workdir 外被拒（`file access denied ... outside my working directory`，无挂起）；/tmp 临时区可写（设计行为） |
 | 多步开发任务 | ✅ 读代码→定位 bug→修复→跑测试→测试通过→结构化报告 |
-| **远程复测（SSH → SUSETLearn00）** | ✅ `REMOTE-DSH-OK`，远程执行者 key 隔离正确（两机 key 不同） |
+| **远程复测（SSH → build host）** | ✅ `REMOTE-DSH-OK`，远程执行者 key 隔离正确（两机 key 不同） |
 
 **结论：dsh 执行者版全面验证通过，明确具备替代 OpenCode 的能力**。核心优势：
 沙箱写墙权限模型（无 headless ask 挂起）、36 工具集（LSP/子代理/终端/会话记忆）、

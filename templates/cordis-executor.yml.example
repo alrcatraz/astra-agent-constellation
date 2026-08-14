@@ -14,7 +14,7 @@
         displayName: Astra AI Gate
         apiKeyEnv: AIGATE_EXECUTOR_KEY
         api: openai-completions
-        baseURL: http://homecentre01.nb.internal:20128/v1
+        baseURL: http://<GATE_HOST>:20128/v1
         models:
           - id: auto/coding
             name: AIGate coding
@@ -174,7 +174,7 @@
   config:
     serverName: markitdown
     transport: streamable-http
-    url: http://homecentre01.nb.internal:20128/api/mcp/servers/markitdown/stream
+    url: http://<GATE_HOST>:20128/api/mcp/servers/markitdown/stream
     headers:
       Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
     failOnStartupError: true
@@ -184,7 +184,7 @@
   config:
     serverName: pageindex
     transport: streamable-http
-    url: http://homecentre01.nb.internal:20128/api/mcp/servers/pageindex/stream
+    url: http://<GATE_HOST>:20128/api/mcp/servers/pageindex/stream
     headers:
       Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
     failOnStartupError: true
@@ -194,7 +194,7 @@
   config:
     serverName: astra-kb
     transport: streamable-http
-    url: http://homecentre01.nb.internal:20128/api/mcp/servers/astra-kb/stream
+    url: http://<GATE_HOST>:20128/api/mcp/servers/astra-kb/stream
     headers:
       Authorization: !!js '`Bearer ${process.env.AIGATE_EXECUTOR_KEY}`'
     failOnStartupError: true
