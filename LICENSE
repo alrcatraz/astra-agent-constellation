@@ -1,0 +1,16 @@
+Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+
+This work (the astra-agent-constellation specification documents, including
+docs/ and references/) is licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International License.
+
+You are free to share and adapt the material under the following terms:
+  * Attribution — You must give appropriate credit.
+  * ShareAlike — If you remix, transform, or build upon the material, you
+    must distribute your contributions under the same license as the original.
+
+Full legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+Code and configuration templates (templates/, scripts/) are additionally
+available under the MIT License — see templates/LICENSE-MIT and
+scripts/LICENSE-MIT.
