@@ -33,6 +33,12 @@
 报告：<决策记录 + diff 摘要 + 验证输出>
 ```
 
+**ACP 化（ADR 0006）**：协议化派发时，上述字段映射为 ACP content blocks
+（Metadata → `_meta`、Objective/Scope/Stopping → text block、验收命令 →
+逐条 text block、AGENTS.md → resource_link），完整映射见
+[10 章 ACP 内容映射](10-acp-mapping.md)。task-brief.md 仍是执行者的工作文档
+与人类可读完整版，与 ACP 传输并行存在。
+
 ## 3. 工具层（硬锁）
 
 执行者配置文件（opencode.json）中声明 permissions：
@@ -51,6 +57,21 @@
 - **MUST**：`env` 默认 deny（防止执行者读取并回显凭证环境变量）。
 - **SHOULD**：`doom_loop` 开启（同一工具调用重复 3 次转询问，防死循环烧 token）。
 - **MUST NOT**：执行者被授予任何超出其工作目录的写权限。
+
+**dsh 执行者的权限模型（等价实现，2026-08-14 实测）**：dsh 用沙箱策略替代
+permissions 声明——`executor/cordis.yml`（模板 `templates/cordis-executor.yml.example`）
+中 `sandbox-policy` 设 `mode: workspace-write`：
+
+- **写墙**：workdir 外写入被沙箱直接拒绝并返回清晰错误（`file access denied ...
+  outside my working directory`）——**无 OpenCode headless ask 挂起问题**，
+  模型立即理解并报告，无需人工介入。
+- **读自由**：workdir 外读取允许（执行者读参考材料/蓝图仓 brief 无需应答）。
+- **/tmp 临时区可写**（平台临时区豁免，sandbox 设计行为）。
+- **纪律 persona**：cordis.yml 的 acp-agent persona 声明「NEVER run git write
+  operations (commit/push/rebase/reset/checkout)」——git 写操作归编排者。
+
+两种实现满足同一硬锁规范：OpenCode 走 permissions 声明（deny 黑名单 +
+external_directory ask），dsh 走沙箱写墙（workspace-write 强制边界）。
 
 ## 4. 规则层（AGENTS.md 行为规范）
 
