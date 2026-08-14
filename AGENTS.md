@@ -68,23 +68,36 @@ exclude these paths.
 `scripts/registry-check.py` enforces the placeholder rule on the agent
 registry — run it before publishing.
 
-## ACP transport note (2026-08-14)
+## ACP transport note (2026-08-14, updated 2026-08-15)
 
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
 `copilot-acp` provider is the ACP client** — configure
 `HERMES_COPILOT_ACP_COMMAND`/`HERMES_COPILOT_ACP_ARGS` to point at the
-executor (e.g. `ssh -T -p <port> <build-host> opencode acp --cwd <workdir>`).
-Full chain verified end-to-end against a remote OpenCode (2026-08-14).
-**When OpenCode adds official ACP Web Transport support (Streamable HTTP /
-WebSocket), switch the remote transport to the official standard** — the
-provider runtime accepts any command, so this is a drop-in config change.
+executor. **dsh (DeepSeek Harness) is the production executor since
+2026-08-15** (replaced OpenCode):
 
-**dsh (DeepSeek Harness) is a verified alternative executor (2026-08-14):**
-`ssh -T -p <port> <build-host> "cd ~/Projects/dsh && node --import tsx
-packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml"` — full
-chain verified local (HC01) and remote (SUSETLearn00). dsh's sandbox
-(workspace-write) has no headless ask-hang; recommended over OpenCode for
-new deployments. Deployment manual: `dsh-executor-deployment` skill.
+```bash
+# ~/.hermes/.env — orchestrator side holds ONLY the launch command, no key
+HERMES_COPILOT_ACP_COMMAND="bash"
+HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
+```
+
+- Local (HC01): command above. Remote (SUSETLearn00): same via
+  `ssh -T -p <port> <build-host> "<command>"`.
+- **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
+  that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
+  at boot). Never in the tar deploy, never in the repo, never in Hermes'
+  own env — the orchestrator must not hold the executor identity.
+  `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
+  so the same config file works on every host.
+- dsh sandbox (workspace-write) has no headless ask-hang; verified local
+  (HC01) and remote (SUSETLearn00). Deployment manual:
+  `dsh-executor-deployment` skill.
+- **Legacy**: OpenCode remains supported as a fallback (same env-var
+  mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official
+  ACP Web Transport support, switch the remote transport to the official
+  standard — the provider runtime accepts any command, so this is a
+  drop-in config change.
 
 ## Code hygiene
 
