@@ -59,8 +59,32 @@ Two copies of this repository exist:
 
 Publishing to GitHub without sanitisation is a release-blocking violation.
 
+Private-only content that MUST stay off the public branch (`public`):
+`agent-registry/` (real registry), `PLAN.md` (progression log), `tasks/`
+(task-brief instances — carry real agent refs and machine names). The
+`public` branch carries the sanitised tree; any sync from `main` MUST
+exclude these paths.
+
 `scripts/registry-check.py` enforces the placeholder rule on the agent
 registry — run it before publishing.
+
+## ACP transport note (2026-08-14)
+
+The orchestrator→executor dispatch seam uses ACP. **Hermes' native
+`copilot-acp` provider is the ACP client** — configure
+`HERMES_COPILOT_ACP_COMMAND`/`HERMES_COPILOT_ACP_ARGS` to point at the
+executor (e.g. `ssh -T -p <port> <build-host> opencode acp --cwd <workdir>`).
+Full chain verified end-to-end against a remote OpenCode (2026-08-14).
+**When OpenCode adds official ACP Web Transport support (Streamable HTTP /
+WebSocket), switch the remote transport to the official standard** — the
+provider runtime accepts any command, so this is a drop-in config change.
+
+**dsh (DeepSeek Harness) is a verified alternative executor (2026-08-14):**
+`ssh -T -p <port> <build-host> "cd ~/Projects/dsh && node --import tsx
+packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml"` — full
+chain verified local (HC01) and remote (SUSETLearn00). dsh's sandbox
+(workspace-write) has no headless ask-hang; recommended over OpenCode for
+new deployments. Deployment manual: `dsh-executor-deployment` skill.
 
 ## Code hygiene
 

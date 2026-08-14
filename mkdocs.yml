@@ -68,6 +68,7 @@ nav:
       - 双星模式: 06-gemini-pattern.md
       - 看护者操作手册: 08-guardian-runbook.md
       - 演练剧本: 09-game-day.md
+      - ACP 内容映射: 10-acp-mapping.md
   - 采纳路径: 07-adoption.md
   - 决策记录:
       - references/0001-agent-platform-selection.md
@@ -75,3 +76,4 @@ nav:
       - references/0003-guardian-placement.md
       - references/0004-sync-layer-split.md
       - references/0005-observability-contract.md
+      - references/0006-inter-agent-protocol-selection.md

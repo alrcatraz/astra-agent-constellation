@@ -92,8 +92,12 @@
 ```yaml
 # 工具服务注册条目（注册域契约）
 service: <service-name>          # 唯一名，命名空间：<domain>-<tool>（如 markitdown-ocr）
-kind: builtin | stdio | http | sse   # 端点形态（对齐 MCP 服务器 kind）
-endpoint: <url-or-command-ref>   # http/sse: URL；stdio: 命令引用；builtin: 进程内
+kind: builtin | stdio | http   # 连接形态（纯语义，对齐 aigate McpServerKind）
+                              #   builtin = 进程内；stdio = 本地子进程管道；
+                              #   http = 网络端点。sse/stream 不是 kind——
+                              #   是 http 端点的传输变体（URL 路径选择，如
+                              #   /sse 或 /stream），不入本枚举
+endpoint: <url-or-command-ref>   # http: URL（含 /sse 或 /stream 传输变体）；stdio: 命令引用；builtin: 进程内
 scopes:                          # 门禁授权粒度——每个 scope 一个最小权限
   - <resource>:<action>          # 如 search:read、ocr:convert、registry:write
 exposed:                         # 对哪些智能体可见
