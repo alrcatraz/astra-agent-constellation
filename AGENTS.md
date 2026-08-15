@@ -73,8 +73,8 @@ registry — run it before publishing.
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
 `copilot-acp` provider is the ACP client** — configure
 `HERMES_COPILOT_ACP_COMMAND`/`HERMES_COPILOT_ACP_ARGS` to point at the
-executor. **dsh (DeepSeek Harness) is the production executor since
-2026-08-15** (replaced OpenCode):
+executor. **dsh (DeepSeek Harness) is the recommended production executor since
+2026-08-15** (OpenCode remains available as legacy):
 
 ```bash
 # ~/.hermes/.env — orchestrator side holds ONLY the launch command, no key
