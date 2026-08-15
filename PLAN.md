@@ -1,7 +1,7 @@
 # PLAN — Astra Agent Constellation 推进路线
 
 > 蓝图仓库是规格仓（非软件），本文档记录「落地推进」的待办与状态。完成一项打勾并标注日期/commit。
-> 0.1.0 已发布（gitea 私有，v0.1.0，2026-08-04）；**v0.2.0（2026-08-14，ACP 化 + dsh 执行者版）**；**v0.2.1（2026-08-15，添加 dsh 作为推荐执行者之一 + A2A 支持核实落地）**；正式版 v1.0.0 待 AIGate 开发完成 + 实际部署验证后再出。
+> 0.1.0 已发布（gitea 私有，v0.1.0，2026-08-04）；**v0.2.0（2026-08-14，ACP 化 + dsh 执行者版）**；**v0.2.1（2026-08-15，添加 dsh 作为推荐执行者之一 + A2A 支持核实落地）**；**v0.2.2（2026-08-15，总是知晓保证机制——编排者/看护者架构感知常驻化）**；正式版 v1.0.0 待 AIGate 开发完成 + 实际部署验证后再出。
 
 ## 已完成
 
@@ -18,6 +18,7 @@
 - [x] 技能导入流程验证 + skill 落地（2026-08-10）— 编排者**用自己的 key** 经 AIGate Skill Hub 从外部导入技能的端到端链路跑通：`GET /api/skills/sources`（源清单 8 个）→ `GET /api/skills/sources/<id>/discover`（技能 meta：sourceUrl/commitSha/externalId）→ `POST /api/skills/sources/<id>/install`（注册进 skillRegistry，返回 id）→ `GET /api/skills/artifacts`（消费清单）→ `GET /api/skills/artifacts/<id>?format=agent-plugin`（拉 SKILL.md 包 + sha256 校验）→ 规范化落位。**AIGate 侧 2 缺口待修**（报部署会话）：`gitRepoAdapter` 嵌套技能（如 `git/skills/`）fetch 路径丢中间层（discover 能列但 install ENOENT）；无「整源 tarball 下发接口」（artifacts 只给单技能，无法交整项目给消费方分析附属文件）。7 个 astra-vcs-assist 子技能因此暂从本地源仓库取（内容与 sourceUrl 仓库 commitSha 一致）。运行手册 skill 新增「Importing skills from outside」小节并标记 Verified。
 - [x] Godot 开发机部署（2026-08-10）— godot-agentic-toolkits 技能部署至 SUSETLearn00 执行者（OpenCode skills 目录，含 references），executor-susetlearn00 可加载使用；godot-mcp + Godot 引擎已在机。多智能体架构指定 Godot 项目由 SUSETLearn00 开发、该 repo 工具部署于该机并由 executor-susetlearn00 访问（AIGate 已登记该源）。
 - [x] Note.md 附带发现处置（2026-08-14）— 三发现辨析：①「技能双份拷贝」= 误报（~/.hermes 为符号链接指向仓库，reference-not-copy 正确落地，无需处理）；②「审计缺输入完整性」= 属实 → docs/05 §5.1 补 SHOULD 条款（模型可见输入可追溯，「Model-visible means logged」不变量）；③「kind 枚举类型混淆」= 实现已解决、蓝图落后 → docs/03 §3.4 kind 对齐 aigate 实现 `builtin|stdio|http`（sse/stream 是 http 端点的传输变体，由 URL 路径选择，不入枚举）。均不牵动 aigate 实现。Note.md 为转交媒介，处置完毕已清理。
+- [x] **「总是知晓」保证机制（2026-08-15，v0.2.2）**— docs/11-always-aware.md 定义三层保证：① 常驻注入（Linux drop-in 模式，内容归算子侧，实现见生态元仓 context-anchor v2.2）；② 触发加载（星座 skill 描述扩 dispatch/parallel 触发词）；③ 动态发现（A2A discover 演进接口，当前静态快照 100% 覆盖无需动态）。公开副本仅保留 11.2 思路层，11.3 部署细节私有（插件名/路径/环境变量不公开）。
 
 ## 进行中 / 已规划
 
