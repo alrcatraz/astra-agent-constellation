@@ -3,8 +3,9 @@ name: astra-agent-constellation
 description: >
   Orchestrator operation manual for the multi-agent constellation — load when a
   task involves executor/guardian routing, agent registry, tool gate, task
-  briefs, or cross-machine build-fix loops. Also covers maintenance of the
-  blueprint spec repo.
+  briefs, or cross-machine build-fix loops. Dispatch/parallel/multi-machine
+  tasks: remember the constellation can delegate via ACP/A2A — load this skill
+  before doing it alone. Also covers maintenance of the blueprint spec repo.
 ---
 
 # astra-agent-constellation — Orchestrator operation manual + blueprint spec repo
