@@ -76,7 +76,7 @@ Three-layer SemVer (consistent with the astra ecosystem):
 
 | Layer | Version | Purpose |
 |:------|:--------|:--------|
-| official | `v0.2.0` | GitHub public copy / registry.yaml / git tag (current release) |
+| official | `v0.2.1` | GitHub public copy / registry.yaml / git tag (current release) |
 | personal | `v0.1.0+alrcatraz.Y` | Private copy personalised revision (after real-topology override) |
 | local | `v0.1.0+alrcatraz.Y.<variant>.Z` | Machine-local variant |
 
@@ -154,7 +154,7 @@ mkdocs serve   # 或 mkdocs build
 
 | 层级 | 版本 | 用途 |
 |:-----|:-----|:-----|
-| official | `v0.2.0` | GitHub 公开副本 / registry.yaml / git tag（当前发布） |
+| official | `v0.2.1` | GitHub 公开副本 / registry.yaml / git tag（当前发布） |
 | personal | `v0.1.0+alrcatraz.Y` | 私有副本个性化修订（真实拓扑覆盖后） |
 | local | `v0.1.0+alrcatraz.Y.<variant>.Z` | 本机变体 |
 
