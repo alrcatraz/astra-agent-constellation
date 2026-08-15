@@ -264,3 +264,8 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - `astra-vcs-assist-git-dev` — feature→development→main branch discipline.
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
+- A2A inter-agent protocol — enable/configure/test ladder (L0 discovery →
+  L1 self-loopback → L2 dual-instance peering), Hermes port allocation
+  (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
+  `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
+  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
