@@ -24,6 +24,7 @@
 - 想看双子架构 → [双星模式](06-gemini-pattern.md)
 - 想落地实施 → [采纳路径](07-adoption.md)
 - 想了解关键决策 → [决策记录](references/0001-agent-platform-selection.md)
+- 想保证架构感知常驻 → [总是知晓](11-always-aware.md)
 
 ## 版本与许可
 
