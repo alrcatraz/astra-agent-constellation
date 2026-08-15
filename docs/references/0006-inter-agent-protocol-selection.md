@@ -63,3 +63,39 @@
   remote-acp-connectivity 方案。
 - 执行者需支持 ACP server 模式（OpenCode 侧成熟度待验证）。
 - A2A 不引入，直到出现多个编排者或对等协作需求。
+
+## 事实注记（2026-08-15 核实）
+
+- **Hermes 原生已支持 A2A v1.0**（插件 `plugins/platforms/a2a`，双向：
+  outbound `a2a_call`/`a2a_orchestrate` 等 5 工具 + inbound Agent Card /
+  JSON-RPC / SSE / push webhook）。「A2A 留给未来」的成本假设已从
+  「需自研 client/server」降为「开配置即用」（`gateway.platforms.a2a.
+  enabled: true` + `a2a_agents` 对端列表）。
+- **选型依据不变**：决策基于接缝的**关系模型**（主从派活 vs 对等协作），
+  非平台能力。执行者（dsh）无 A2A server（`packages/` 仅 ACP），主从
+  派活仍走 ACP 子进程 stdio；A2A 仅留给未来「多编排者对等协作」。
+- **协议同名警示**：ACP 有双义——Agent **Client** Protocol（Zed 发起，
+  dsh/Hermes copilot-acp 所用，独立活跃）与 Agent **Communication**
+  Protocol（IBM BeeAI，2025-08-29 已并入 A2A）。本文「ACP」一律指
+  Agent Client Protocol。
+
+## 端口规划（2026-08-15 定案）
+
+A2A inbound 与 Hermes 全组件统一规划，原则：**Hermes 相关端口一律用
+官方默认值**（官方默认即天然互不冲突的分配方案）。
+
+| 端口 | 归属 | 说明 |
+|:--|:--|:--|
+| 9900 | A2A inbound | 官方默认（`adapter.py:62` `_DEFAULT_PORT`），本机已启用并持久化 |
+| 9901 | Hermes serve | 现有运行实例（TUI/API），固定不动 |
+| 9119 | Dashboard | 官方默认（`hermes dashboard --help`），将来直接用 |
+| 8642/8644/8645 | API server / webhook | 官方默认（`config_defaults.py`），未启用，预留 |
+| 9222 | browser CDP | 调试用（`browser_connect.py:20`），未启用 |
+
+排除项：9900 与 dashboard（9119）无冲突——两者官方默认端口即相隔
+200+ 端口；非 Hermes 服务（ZeroTier 9993 / mihomo 9090,1053 / llama
+8091 / aigate 20128）均不在 99xx 段竞争。
+
+**实测（2026-08-15）**：本机 A2A 双向对等全链路已验证（L0 发现
+Agent Card → L1 本机自连 → L2 双 profile 对调），零代码纯配置。
+
