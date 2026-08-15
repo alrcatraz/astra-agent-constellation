@@ -166,7 +166,7 @@ MCP 工具命名与 Hermes 一致。部署/配置手册见 `dsh-executor-deploym
 
 ### dsh 生产落地（2026-08-15，v0.2.1）
 
-dsh 正式替换 OpenCode 成为生产执行者：
+dsh 落地为推荐执行者（OpenCode 保持存量可用）：
 
 - **编排侧**：Hermes 原生 `copilot-acp` provider 的启动命令持久化在
   `~/.hermes/.env`（`HERMES_COPILOT_ACP_COMMAND` = `bash`、
