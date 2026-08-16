@@ -7,8 +7,9 @@
 
 | 文件 | 作用 |
 |:--|:--|
-| `a2a_server_main.py` | **对外 A2A 端点**（A2A v1.0 JSON-RPC + AgentCard）。顶部 `EXTERNAL_*` 常量读环境变量，默认占位。 |
-| `anp_server_main.py` | **对外 ANP 端点**（OpenANP，`/agent/ad.json`、`/rpc`、`/agent/did.json`）。机器值全由 env 注入。 |
+| `a2a_server_main.py` | **对外 A2A 端点**（A2A v1.0 JSON-RPC + AgentCard），收到任务转给本机 Hermes 智能体执行。 |
+| `anp_server_main.py` | **对外 ANP 端点**（OpenANP，`/agent/ad.json`、`/rpc`、`/agent/did.json`），`/task` 方法转给本机 Hermes 智能体执行。 |
+| `dispatch.py` | **本机 Hermes 派发桥**：把外部任务（带已验证的外部方身份）经 `hermes -z` 单跳交给本机智能体执行并返回结果。 |
 | `anp_auth.py` | ANP 端点用 HTTP Message Signature（RFC 9421）鉴权中间件，验证方来自预共享 DID 文档目录（Phase-1，免 HTTPS/DNS）。 |
 
 ## 运行
@@ -19,16 +20,23 @@
 # 公共环境变量
 export EXTERNAL_HOST=<对外绑定的地址，如 0.0.0.0 / 指定网卡>
 
+# 本机 Hermes 派发桥（两端点共用）
+export HERMES_DISPATCH_BIN=hermes                              # Hermes 可执行路径
+export HERMES_DISPATCH_PROFILE=<profile，可选>
+export DISPATCH_IDENTITY_LABEL=<身份字段名，如 "external caller DID">
+
 # A2A
 export EXTERNAL_A2A_PORT=9910
 export EXTERNAL_A2A_KEY=<对外 A2A 任务的 API key>
+# 可选：按外部方区分身份（每个外部 peer 一个 key -> 标识）
+export EXTERNAL_A2A_PEERS="alpha=<keyA>,beta=<keyB>"
 export EXTERNAL_CARD_URL=https://<public-host>:<port>   # 对外可达的 AgentCard URL
 
 # ANP
 export EXTERNAL_ANP_PORT=9911
 export EXTERNAL_ANP_NAME=<对外展示名>
-export EXTERNAL_ANP_DID=did:all:<...>
-export ANP_ENABLE_AUTH=1
+export EXTERNAL_ANP_DID=did:wba:<domain>
+export ANP_AUTH_MODE=phase1|didwba
 export ANP_TRUSTED_DIDS_DIR=<可信对端 DID 文档目录>
 export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>
 
@@ -42,12 +50,15 @@ export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>
 ## 实例化到私有副本
 
 每个成员把本模板拷入自己的**私有副本**（`~/.astra/...` 机器实例），
-填入该成员真实值（绑定地址、端口、key、DID、信任目录）。模板保持通用，
+填入该成员真实值（绑定地址、端口、key、DID、信任目录、Hermes 路径）。模板保持通用，
 机器特定值永远在私有副本，不写回公共模板——公共版推 GitHub 公开时不含
 任何成员基础设施细节。
 
 ## 鉴权现状
 
-- **A2A**：`A2A_*_KEY` 有值时启用 X-API-Key 鉴权（错误/缺失 → 401）。
-- **ANP**：`ANP_ENABLE_AUTH=1` 时启用 RFC 9421 签名验证（对签 200 /
-  无签/错签 401）。完整 DID-WBA（`did:wba:<domain>`，需 HTTPS）为 Phase-2。
+- **A2A**：`EXTERNAL_A2A_KEY`（或 `EXTERNAL_A2A_PEERS` 每 peer 一 key）有值时
+  启用 X-API-Key 鉴权（错误/缺失 → 401）。命中 PEERS 的调用方以该 peer 名
+  作为身份透传给本机 Hermes。
+- **ANP**：`ANP_AUTH_MODE=phase1`（预共享 DID 目录）或 `didwba`（真 DID-WBA，
+  现场网络解析，需公网子域 + 证书，推荐）。phase1 无签/错签 401；didwba
+  未签名/错签名 403+签验。完整接入见 docs/12 §12.10-12.12。
