@@ -25,6 +25,7 @@
 - 想落地实施 → [采纳路径](07-adoption.md)
 - 想了解关键决策 → [决策记录](references/0001-agent-platform-selection.md)
 - 想保证架构感知常驻 → [总是知晓](11-always-aware.md)
+- 想与外部智能体/团体协作 → [对外互操作](12-external-interop.md)
 
 ## 版本与许可
 
