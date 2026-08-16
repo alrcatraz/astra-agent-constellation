@@ -154,3 +154,143 @@ https://{agent}.{public-domain}/                               # A2A JSON-RPC �
   （如 urllib）经反向代理转发时**请求体可能丢失**（Content-Digest 验签
   失败），真实对端（HTTPX / curl 样式）无此问题。诊断时先确认后端实际
   收到的 body 长度与摘要，再归因服务器或客户端。
+
+## 12.10 对端互连操作手册（可执行）
+
+本节面向**作为对端**接入本蓝图的 agent / 会话 / 脚本：即你的系统要
+连接到一个已按 12.2–12.9 部署的外部成员，读取其身份与能力、发起一次
+受信任调用。本节是操作手册（怎么用），不是架构说明；所有示例脱敏，
+用 `<HOST>`（对外域名）、`<PORT>`（A2A 或 ANP 端口）等占位符表示。
+
+### 12.10.1 两条路径，先分清
+
+| 层 | 端点形态 | 用途 | 鉴权 |
+|:--|:--|:--|:--|
+| **A2A** | `<HOST>/` 上 JSON-RPC，卡片在 `/.well-known/agent.json` | 投递任务、会话式协作（agent 对 agent） | API key 头 / 白名单 |
+| **ANP** | `<HOST>/rpc`，身份在 `/<agent>/ad.json` + DID 文档 | 受信任的**接口调用**（函数式 RPC） | did:wba 身份 + HTTP 签名 |
+
+- 需要「把一个任务交给对方 agent 去执行、拿回结果」→ **A2A**。
+- 需要「调用对方暴露的一个具体 RPC 接口，且带身份凭据」→ **ANP**。
+- 两边可并存、可独立；一次互连常先 A2A 发现能力，再按能力用 ANP 调
+  具体接口。
+
+### 12.10.2 一次性接入流程
+
+以下流程对 A2A / ANP 通用，只是每步读的文档不同：
+
+1. **发现**：拿到对方对外域名 `<HOST>`（成员登记/目录/部署方提供）。
+2. **拉取身份与能力**：
+   - A2A：`GET https://<HOST>/.well-known/agent.json` → Agent Card
+     （`name`、`skills[]`、`supportedInterfaces[0].url`。
+     注意 **client 连的是卡片里声明的 URL**，不是你自己拼的地址）。
+   - ANP：`GET https://<HOST>/agent/ad.json` → AgentDescription（接口列表）
+     与 `GET https://<HOST>/agent/did.json` → did:wba DID 文档（验签公钥）。
+3. **判断是否 did:wba**：对端 DID 必须是 `did:wba:<hostname>` 前缀。
+   `did:all` 等旧身份在启用 did:wba 的 verifier 侧会被拒绝
+   （见 12.9.4）。若对端仍是旧身份，需先在服务端迁移为 did:wba，否则
+   连接握手必败。
+4. **按目标层鉴权并发起调用**：
+   - A2A：带 API key 头，POST JSON-RPC `message.send`（见 12.10.3）。
+   - ANP：用 DID 文档里的密钥构造 RFC 9421 HTTP 签名，POST `/rpc`
+     （见 12.10.4）。
+5. **验证响应**：成功回包带 `result`；鉴权失败为 401/403；签名错误为
+   400/401 且带验签失败原因。
+
+### 12.10.3 A2A：拉卡片 + 投递消息（最小可执行）
+
+```python
+import httpx
+from a2a.client import ClientConfig, create_client, A2ACardResolver
+from a2a.helpers import new_text_message
+from a2a.types import Role, SendMessageRequest
+
+BASE = "https://<HOST>"          # 对方对外域名
+API_KEY = "<KEY>"                # 对方发你的 API key（无则留空，受白名单保护）
+headers = {"X-API-Key": API_KEY} if API_KEY else {}
+
+async def main():
+    async with httpx.AsyncClient(headers=headers) as hc:
+        card = await A2ACardResolver(httpx_client=hc, base_url=BASE).get_agent_card()
+        client = await create_client(agent=card,
+            client_config=ClientConfig(streaming=False))
+        async for chunk in client.send_message(SendMessageRequest(
+                message=new_text_message("你好，请执行验证任务", role=Role.ROLE_USER))):
+            # chunk 是 Task；最终文本 =
+            #   [a.parts[0].text for a in chunk.artifacts if a.parts]
+            final = [p.text for a in chunk.artifacts if a.parts
+                     for p in a.parts if p.text]
+            if final:
+                print("result:", final[-1])
+```
+
+对应带鉴权的 curl 仅为健康检查（真正的 A2A 消息通常走 SDK/流式）：
+
+```bash
+curl -s -H "X-API-Key: $KEY" "https://<HOST>/.well-known/agent.json" \
+  | python3 -m json.tool | head
+```
+
+> 客户端连的是 Agent Card 声明的 `url`，**不是**你自己传的 `base_url`
+> 拼出的路径——配置服务端 `CARD_URL` 必须与会话实际端口一致，
+> 否则出现 "All connection attempts failed"（见 external-interop
+> reference 的坑）。
+
+### 12.10.4 ANP：取 DID 文档 + 构造签名调用（最小可执行）
+
+ANP 用 **did:wba 身份 + RFC 9421 HTTP 签名**。签名覆盖请求方法、
+`@target-uri`、`content-digest` 等；服务端从 Host 头重建实际 URL 验签。
+**客户端必须对 `@target-uri` 与「服务端会重建的形态」逐字一致**
+（见 12.9.3）；对外 wire 是 HTTPS，签名 URL 常用内部 http scheme。
+
+```python
+import base64, json, time
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from anp.authentication.http_signatures import generate_http_signature_headers
+
+# 1) 材料：对端 DID 文档 + 我方签名私钥（二者来自 did:wba 身份注册）
+did_doc   = json.load(open("<PATH>/did_wba_document.json"))   # 已注册的 DID 文档
+priv      = serialization.load_pem_private_key(
+    open("<PATH>/key-1_priv.pem", "rb").read(), password=None)
+did       = did_doc["id"]
+
+# 2) 目标：内部 http scheme 的签名 URL（须与服务端重建形态一致）
+url  = f"http://<HOST>/rpc"
+
+# 3) 请求体：JSON-RPC 格式，method 取 ad.json 里登记的接口
+body = b'{"jsonrpc":"2.0","id":1,"method":"<METHOD>","params":{"<K>":"<V>"}}'
+
+# 4) 生成 RFC 9421 签名头（keyid = did#key-1，ES256 用 P-256/sha256）
+sig = generate_http_signature_headers(
+    did_document=did_doc, request_url=url, request_method="POST",
+    sign_callback=lambda d, a: priv.sign(d, ec.ECDSA(hashes.SHA256())),
+    body=body, keyid=f"{did}#key-1", nonce=str(int(time.time() * 1000)))
+
+# 5) 经 HTTPS 门面发送
+import subprocess
+cmd = ["curl", "-sk", "--http1.1", "-X", "POST", f"https://<HOST>/rpc",
+       "-H", "Content-Type: application/json"]
+for k, v in sig.items():
+    cmd += ["-H", f"{k}: {v}"]
+cmd += ["--data-binary", body.decode()]
+r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+print(r.stdout[:400])
+```
+
+等价 httpx 直接 POST（与真实现一致，签名头原样透传）：
+`POST https://<HOST>/rpc`，headers = `sig`，data = `body`。
+
+### 12.10.5 失败速查表
+
+| 现象 | 根因 | 处置 |
+|:--|:--|:--|
+| 401/403（A2A 卡片都拿不到） | API key 不对 / 白名单未含本端 | 核对 key 与白名单来源 |
+| `"must start with 'did:wba:'"` | 对端/本方身份是 `did:all` 等旧身份 | 迁移为 did:wba，双方域名可解析（见 12.9.4） |
+| `RSAPrivateKey` / 验签算法不符 | 签名密钥用了 RSA，或 e1/Multikey 推断 bug | 用 k1(secp256k1) 身份 + ES256 签名（12.9.2） |
+| Content-Digest 失败但 body 正常 | 客户端只摘要了 body，没覆盖签名字段；或 urllib body 经反代丢失 | 用 `generate_http_signature_headers` 带 `body=`；换 httpx/curl 客户端（12.9.5） |
+| "All connection attempts failed"（A2A） | client 连卡片声明的 URL，与服务端实际端口不符 | 服务端 `CARD_URL` 与端口一致 |
+| 签名 URL 不匹配 | 客户端签的 `@target-uri` 与服务端重建的形态不一致 | 统一为内部 http scheme、`<HOST>` 走 Host 透传（12.9.3） |
+| 404（ad.json/did.json） | 公开身份文档未挂载/被鉴权拦截 | 应用层加「公开路径中间件」放行身份文档，仅 RPC 面鉴权（12.9.3） |
+
+> 本手册与 docs/12 其余部分同属**通用蓝图**：不含任何特定 agent 的
+> 真实域名、DID 或密钥。具体某个成员的登记值属私有边界，见部署方。
