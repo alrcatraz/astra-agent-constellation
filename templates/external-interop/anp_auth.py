@@ -44,6 +44,12 @@ DEFAULT_EXEMPT = [
     "/docs",
     "*/ad.json",
     "/info/*",
+    # DID document must be publicly resolvable for DID-WBA peer discovery
+    # (a verifier fetches https://<host>/agent/did.json to resolve the agent's
+    # did:wba identity). Served unauthenticated; authentication applies to the
+    # RPC call surface, not to identity resolution.
+    "/agent/did.json",
+    "/.well-known/wba/did.json",
 ]
 
 
@@ -123,6 +129,14 @@ def build_http_signature_middleware(
 
         method = request.method
         url = str(request.url)
+        # Rebuild scheme from X-Forwarded-Proto set by the gateway nginx.
+        # OpenANP signs `@target-uri` with the PUBLIC https URL, so verification
+        # only passes if the device sees the same scheme+authority. uvicorn's
+        # proxy_headers only trusts loopback proxies by default (remote nginx
+        # would be ignored), so reconstruct explicitly rather than rely on it.
+        xfp = request.headers.get("x-forwarded-proto")
+        if xfp and xfp.lower() == "https" and url.startswith("http://"):
+            url = "https://" + url[len("http://"):]
         headers = dict(request.headers)
         body = await request.body()
 

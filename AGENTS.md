@@ -102,8 +102,11 @@ plain mirror of Gitea:
   host/IP/domain/machine names MUST NOT appear anywhere.
 
 Both tracks publish to the **remote `development` branch** of their
-respective remote (Gitea and GitHub). The remote `main` is not used as a
-publish target from here.
+respective remote (Gitea and GitHub). The remote **`main`** branch IS a
+publish target too — it is advanced by a **pull request** from each remote's
+`development`, not by a direct push from here. (`development` is the
+evolving workspace branch; `main` is the remote's stable/merged head for
+that track.)
 
 ### Release procedure (end-to-end)
 
@@ -117,6 +120,9 @@ publish target from here.
 3. **Publish private track**: `git -c http.version=HTTP/1.1 push gitea
    main:development`. (Gitea presents a self-signed cert; without `-c
    http.version=HTTP/1.1` you hit TLS `error:0A000126`.)
+3b. **Advance Gitea `main` by PR** (not direct push): open a pull request
+   `development` → `main` on Gitea and merge it. Gitea CLI/API or the web
+   UI both work; the merge must land as a merge commit on `main`.
 4. **Build the public branch from local `main`** (do NOT `git merge main`
    into `public` — that drags private files back in). Reconcile `public` to
    the sanitised target:
@@ -134,12 +140,16 @@ publish target from here.
    # Public-safe additions to KEEP (written sanitised):
    #   docs/12-external-interop.md, templates/external-interop/*
    # Scan the staged tree for real host/IP/domain/machine-name hits
-   # (incl. any machine abbreviation) before committing.
+   # (incl. any machine abbreviation such as <deployment host>) before committing.
    git commit -S -m "... (sanitised)"
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
 5. **Publish public track**: `git push github public:development`.
+5b. **Advance GitHub `main` by PR**: open a pull request
+   `development` → `main` on GitHub and merge it (`gh pr create` +
+   `gh pr merge` work). The GitHub `main` then reflects the sanitised
+   public track's stable head.
 6. **Tag both tracks**: annotated, GPG-signed `git tag -s vX.Y.Z` on local
    `main` and on `public`. Push the tag to both remotes.
 7. **GitHub release**: `gh release create v0.2.3 --title "v0.2.3"` — **the
@@ -173,7 +183,7 @@ HERMES_COPILOT_ACP_COMMAND="bash"
 HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
 ```
 
-- Local (any physical machine): command above. Remote (build host): same via
+- Local (<deployment host>): command above. Remote (<build host>): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -182,7 +192,7 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/exa
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
 - dsh sandbox (workspace-write) has no headless ask-hang; verified local
-  (local) and remote (build host). Deployment manual:
+  (<deployment host>) and remote (<build host>). Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official
