@@ -68,6 +68,27 @@ exclude these paths.
 `scripts/registry-check.py` enforces the placeholder rule on the agent
 registry — run it before publishing.
 
+## External interop (2026-08-16)
+
+The constellation exposes an **external interop boundary** for
+peer-to-peer collaboration with agents/agent groups outside the
+organisation (recorded as an update to ADR 0006). Written content
+about this boundary MUST stay at the level of the ADR — the generic
+`{agent}.{public-domain}` sub-domain scheme, overlay multi-tier
+fallback, and layered A2A + ANP auth — and MUST NOT name:
+
+- the external entry node (jump host / front proxy) or its address;
+- the specific public domain or its DNS record values;
+- the internal overlay organisation (zone prefixes, machine network,
+  member hostnames);
+- the concrete external service ports.
+
+Those values live only in the private copy and the per-machine instance
+copy. Any doc, ADR or PLAN entry describing the boundary is written with
+role names and placeholders. A doc that would need a real domain or
+hostname to make sense is split: generic decision stays in the public
+copy, deployment specifics go to the private copy.
+
 ## ACP transport note (2026-08-14, updated 2026-08-15)
 
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
