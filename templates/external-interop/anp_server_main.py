@@ -207,4 +207,10 @@ def _native_auth_config(trusted_dids_dir: str, allowed_domains: list[str]):
 
 if __name__ == "__main__":
     port = int(os.environ.get("EXTERNAL_ANP_PORT", "9911"))
-    uvicorn.run(build_app(), host="0.0.0.0", port=port)
+    uvicorn.run(
+        build_app(),
+        host="0.0.0.0",
+        port=port,
+        proxy_headers=True,
+        forwarded_allow_ips="*",  # trust X-Forwarded-* set by the gateway nginx
+    )

@@ -102,8 +102,11 @@ plain mirror of Gitea:
   host/IP/domain/machine names MUST NOT appear anywhere.
 
 Both tracks publish to the **remote `development` branch** of their
-respective remote (Gitea and GitHub). The remote `main` is not used as a
-publish target from here.
+respective remote (Gitea and GitHub). The remote **`main`** branch IS a
+publish target too — it is advanced by a **pull request** from each remote's
+`development`, not by a direct push from here. (`development` is the
+evolving workspace branch; `main` is the remote's stable/merged head for
+that track.)
 
 ### Release procedure (end-to-end)
 
@@ -117,6 +120,9 @@ publish target from here.
 3. **Publish private track**: `git -c http.version=HTTP/1.1 push gitea
    main:development`. (Gitea presents a self-signed cert; without `-c
    http.version=HTTP/1.1` you hit TLS `error:0A000126`.)
+3b. **Advance Gitea `main` by PR** (not direct push): open a pull request
+   `development` → `main` on Gitea and merge it. Gitea CLI/API or the web
+   UI both work; the merge must land as a merge commit on `main`.
 4. **Build the public branch from local `main`** (do NOT `git merge main`
    into `public` — that drags private files back in). Reconcile `public` to
    the sanitised target:
@@ -140,6 +146,10 @@ publish target from here.
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
 5. **Publish public track**: `git push github public:development`.
+5b. **Advance GitHub `main` by PR**: open a pull request
+   `development` → `main` on GitHub and merge it (`gh pr create` +
+   `gh pr merge` work). The GitHub `main` then reflects the sanitised
+   public track's stable head.
 6. **Tag both tracks**: annotated, GPG-signed `git tag -s vX.Y.Z` on local
    `main` and on `public`. Push the tag to both remotes.
 7. **GitHub release**: `gh release create v0.2.3 --title "v0.2.3"` — **the
