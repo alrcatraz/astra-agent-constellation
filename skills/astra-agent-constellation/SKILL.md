@@ -270,3 +270,10 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
   Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
+- **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
+  *separate* concern from the internal Hermes A2A ladder above. When a task
+  involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
+  endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
+  (general blueprint incl. did:wba 12.9) + the operator's private copy of the
+  external-endpoint docs. Outward A2A/ANP ports (9910/9911 on the primary
+  host) and the internal 9900 Hermes A2A must not be conflated.
