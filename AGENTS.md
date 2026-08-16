@@ -89,6 +89,76 @@ role names and placeholders. A doc that would need a real domain or
 hostname to make sense is split: generic decision stays in the public
 copy, deployment specifics go to the private copy.
 
+## Releasing (dual-track) (2026-08-16)
+
+This repository is released on **two independent tracks**. GitHub is NOT a
+plain mirror of Gitea:
+
+- **Private track** (Gitea): complete tree on the local `main` branch.
+  Holds `PLAN.md`, `agent-registry/`, `tasks/` and real machine/host/port
+  values.
+- **Public track** (GitHub): sanitised subset on the local `public` branch.
+  Excludes every file below that could leak private topology; real
+  host/IP/domain/machine names MUST NOT appear anywhere.
+
+Both tracks publish to the **remote `development` branch** of their
+respective remote (Gitea and GitHub). The remote `main` is not used as a
+publish target from here.
+
+### Release procedure (end-to-end)
+
+1. **Develop on `development`**: feature work lands on `development` (or a
+   feature branch merged into it). Commit with `git commit -S`. The release
+   version is `+1` of the latest tag (`git tag -l | sort -V`) and is
+   recorded in `PLAN.md` line 4 before pushing.
+2. **Merge into local `main`** (private track): `git checkout main &&
+   git merge development --no-ff`. Local `main` is now the complete private
+   tree for this release.
+3. **Publish private track**: `git -c http.version=HTTP/1.1 push gitea
+   main:development`. (Gitea presents a self-signed cert; without `-c
+   http.version=HTTP/1.1` you hit TLS `error:0A000126`.)
+4. **Build the public branch from local `main`** (do NOT `git merge main`
+   into `public` — that drags private files back in). Reconcile `public` to
+   the sanitised target:
+   ```
+   git checkout main
+   git checkout -B public             # re-point public at main's tree
+   git rm --cached PLAN.md            # progression log, private-only
+   git rm --cached agent-registry/registry.yaml   # real registry
+   git rm --cached -r tasks           # task-brief instances, real refs
+   # Files kept OUT of public entirely (leak topology / real hosts):
+   #   docs/10-acp-mapping.md          (real test hosts)
+   #   docs/references/0006-...inter-agent-protocol-selection.md
+   #   skills/.../references/a2a-interop.md  (real port plan)
+   #   templates/cordis-executor.yml.example
+   # Public-safe additions to KEEP (written sanitised):
+   #   docs/12-external-interop.md, templates/external-interop/*
+   # Scan the staged tree for real host/IP/domain/machine-name hits
+   # (incl. any machine abbreviation such as HC01) before committing.
+   git commit -S -m "... (sanitised)"
+   ```
+   The `(sanitised)` marker in the commit message identifies public-track
+   commits whose content was scrubbed — preserve it when amending.
+5. **Publish public track**: `git push github public:development`.
+6. **Tag both tracks**: annotated, GPG-signed `git tag -s vX.Y.Z` on local
+   `main` and on `public`. Push the tag to both remotes.
+7. **GitHub release**: `gh release create v0.2.3 --title "v0.2.3"` — **the
+   release title is ONLY the version string**, nothing else (no description,
+   no changelog, no prefix). A bare tag name as the whole title. (This is a
+   documented recurring mistake in another project — do not repeat it.)
+
+### Rules
+
+- Local `main` is the complete-tree parent; local `public` is its sanitised
+  subset. A file must never appear on GitHub that is missing from Gitea, but
+  the reverse (Gitea-only files) is normal.
+- `development` is the deliverable branch name published to both remotes
+  (`main:development`, `public:development`), never a feature branch.
+- Private-only content — `PLAN.md`, `agent-registry/registry.yaml`,
+  `tasks/` — MUST be removed from any tree pushed to GitHub.
+- Reconcile `public` by deletion/trimming from `main`; never `git merge`
+  straight into `public` (that re-imports the private files).
+
 ## ACP transport note (2026-08-14, updated 2026-08-15)
 
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
