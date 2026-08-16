@@ -274,6 +274,8 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
   endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
-  (general blueprint incl. did:wba 12.9) + the operator's private copy of the
-  external-endpoint docs. Outward A2A/ANP ports (9910/9911 on the primary
+  (general blueprint incl. did:wba 12.9, and the **peer interop handbook 12.10**
+  with copy-paste A2A card+message and ANP DID+signature clients and a failure
+  triage table) + the operator's private copy of the external-endpoint docs.
+  Outward A2A/ANP ports (9910/9911 on the primary
   host) and the internal 9900 Hermes A2A must not be conflated.
