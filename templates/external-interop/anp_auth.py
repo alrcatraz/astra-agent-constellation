@@ -44,6 +44,12 @@ DEFAULT_EXEMPT = [
     "/docs",
     "*/ad.json",
     "/info/*",
+    # DID document must be publicly resolvable for DID-WBA peer discovery
+    # (a verifier fetches https://<host>/agent/did.json to resolve the agent's
+    # did:wba identity). Served unauthenticated; authentication applies to the
+    # RPC call surface, not to identity resolution.
+    "/agent/did.json",
+    "/.well-known/wba/did.json",
 ]
 
 
