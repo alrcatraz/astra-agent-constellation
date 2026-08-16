@@ -265,15 +265,13 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - `astra-vcs-assist-git-dev` — feature→development→main branch discipline.
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
-- A2A inter-agent protocol — enable/configure/test ladder (L0 discovery →
-  L1 self-loopback → L2 dual-instance peering), Hermes port allocation
-  (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
-  `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
-  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
-  *separate* concern from the internal Hermes A2A ladder above. When a task
+  *separate* concern from any internal Hermes A2A ladder. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
   endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
-  (general blueprint incl. did:wba 12.9) + the operator's private copy of the
-  external-endpoint docs. Outward A2A/ANP ports (9910/9911 on the primary
-  host) and the internal 9900 Hermes A2A must not be conflated.
+  (general blueprint: protocol layering 12.2, auth 12.4, did:wba identity 12.9,
+  and the **peer interop handbook 12.10** with copy-paste A2A card+message and
+  ANP DID+signature clients and a failure triage table). The internal-Hermes-Specific
+  A2A ladder and its supporting references are kept out of the public track
+  (see AGENTS.md sanitisation list); the public track deliberately references
+  only the sanitised external-interop documentation above.
