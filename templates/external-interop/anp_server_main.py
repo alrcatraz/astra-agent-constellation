@@ -40,8 +40,12 @@ import os
 import starlette.middleware
 import uvicorn
 from fastapi import FastAPI
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
-from anp.fastanp import FastANP
+from anp.fastanp import Context, FastANP
+
+from dispatch import run_hermes_oneshot, DispatchError
 
 KEYS_DIR = os.environ.get("ANP_KEYS_DIR", "<KEYS_DIR>")
 DID = os.environ.get(
@@ -120,6 +124,22 @@ def build_app() -> FastAPI:
     async def echo(text: str = "") -> dict:
         return {"message": f"external-anp-ok | astra constellation | echo: {text}"}
 
+    @anp.interface(
+        "/task",
+        description=(
+            "Execute an operational/administrative task by handing it to the "
+            "local Hermes agent. The caller is identified by the DID-WBA "
+            "signature verified at the boundary (context.did)."
+        ),
+    )
+    async def task(context: Context, text: str = "") -> dict:
+        caller_did = getattr(context, "did", None) or "anonymous"
+        try:
+            result = run_hermes_oneshot(task=text, identity=caller_did)
+            return {"message": result, "origin_did": caller_did}
+        except DispatchError as exc:
+            return {"error": str(exc), "origin_did": caller_did}
+
     def _build_ad() -> dict:
         ad = anp.get_common_header(agent_description_path="/agent/ad.json")
         ad["Infomations"] = anp.get_information_list(
@@ -156,9 +176,6 @@ def build_app() -> FastAPI:
     # PUBLIC-PATHS pre-middleware: registered AFTER FastANP so it runs FIRST
     # (FastAPI executes later-registered http middleware outermost). It lets
     # discovery + DID resolution through without auth regardless of auth mode.
-    from starlette.requests import Request
-    from starlette.responses import JSONResponse
-
     @app.middleware("http")
     async def public_paths(request: Request, call_next):
         path = request.url.path
