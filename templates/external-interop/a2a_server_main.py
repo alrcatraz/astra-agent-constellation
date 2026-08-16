@@ -42,26 +42,43 @@ from a2a.types import (
     TaskState,
 )
 
+from dispatch import run_hermes_oneshot, DispatchError
+
 EXTERNAL_HOSTS = [os.environ.get("EXTERNAL_HOST", "0.0.0.0")]
 PORT = int(os.environ.get("EXTERNAL_A2A_PORT", "9910"))
 ACCESS_KEY = os.environ.get("EXTERNAL_A2A_KEY", "")
-# Agent Card URL is what clients use to locate us; override with the public
+# Optional per-peer API keys -> external caller identity. Format:
+#   EXTERNAL_A2A_PEERS="alpha=<keyA>,beta=<keyB>"
+# Lets the agent distinguish specific external peers (Alpha -> "alpha"), not
+# just "internal vs external". When unset, falls back to the single
+# EXTERNAL_A2A_KEY and every authenticated caller is labelled "external".
+PEERS = {}
+_peers_env = os.environ.get("EXTERNAL_A2A_PEERS", "").strip()
+if _peers_env:
+    for chunk in _peers_env.split(","):
+        if "=" in chunk:
+            name, key = chunk.split("=", 1)
+            PEERS[name.strip()] = key.strip()
+# Card URL is what clients use to locate us; override with the public
 # host:port when a stable address is known.
 CARD_URL = os.environ.get("EXTERNAL_CARD_URL", f"http://{EXTERNAL_HOSTS[0]}:{PORT}")
 
 
-class VerificationAgent:
-    """Minimal external-facing verification agent for the astra constellation."""
+class DispatchAgent:
+    """External-facing agent: hands tasks to the local Hermes agent for real
+    execution, tagging each request with the authenticated external caller.
+    """
 
-    async def invoke(self, user_request: str) -> str:
-        return (
-            f"external-interop-ok | astra constellation | echo: {user_request}"
-        )
+    async def invoke(self, user_request: str, identity: str) -> str:
+        try:
+            return run_hermes_oneshot(task=user_request, identity=identity)
+        except DispatchError as exc:
+            return f"dispatch-error: {exc}"
 
 
-class VerificationAgentExecutor(AgentExecutor):
+class DispatchAgentExecutor(AgentExecutor):
     def __init__(self) -> None:
-        self.agent = VerificationAgent()
+        self.agent = DispatchAgent()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         if context.current_task:
@@ -79,7 +96,10 @@ class VerificationAgentExecutor(AgentExecutor):
         )
 
         query = get_message_text(context.message)
-        result = await self.agent.invoke(user_request=query or "no-input")
+        identity = getattr(context, "peer_name", None) or "unknown"
+        result = await self.agent.invoke(
+            user_request=query or "no-input", identity=identity
+        )
         await task_updater.add_artifact(
             parts=[new_text_part(text=result, media_type="text/plain")]
         )
@@ -93,32 +113,45 @@ class VerificationAgentExecutor(AgentExecutor):
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
-    """Reject requests missing/invalid the API key (X-API-Key header)."""
+    """Reject requests missing/invalid an API key (X-API-Key header), and label
+    the authenticated external caller on ``request.state.peer_name`` so the
+    executor can pass a specific identity down to the local agent.
+    """
 
-    def __init__(self, app, *, key: str) -> None:
+    def __init__(self, app, *, peers: dict[str, str], single_key: str) -> None:
         super().__init__(app)
-        self._key = key
+        self._peers = peers
+        self._single_key = single_key
 
     async def dispatch(self, request: Request, call_next):
-        if not self._key:
-            return await call_next(request)
-        presented = request.headers.get("X-API-Key", "")
-        if presented != self._key:
-            return JSONResponse(
-                {"detail": "invalid or missing API key"}, status_code=401
-            )
+        key = request.headers.get("X-API-Key", "")
+        if self._peers:
+            identity = next((name for name, k in self._peers.items() if k == key), None)
+            if identity is None:
+                return JSONResponse(
+                    {"detail": "invalid or missing API key"}, status_code=401
+                )
+            request.state.peer_name = identity
+        elif self._single_key:
+            if key != self._single_key:
+                return JSONResponse(
+                    {"detail": "invalid or missing API key"}, status_code=401
+                )
+            request.state.peer_name = "external"
+        else:
+            request.state.peer_name = "unauthenticated"
         return await call_next(request)
 
 
 def build_app() -> Starlette:
     skill = AgentSkill(
-        id="verification_echo",
-        name="Astra External Verification",
-        description="Verifies external A2A connectivity to the astra constellation.",
+        id="external_task",
+        name="Astra External Task",
+        description="Executes operational/administrative tasks by handing them to the local Hermes agent.",
         input_modes=["text/plain"],
         output_modes=["text/plain"],
-        tags=["astra", "external-interop", "verification"],
-        examples=["ping your constellation"],
+        tags=["astra", "external-interop", "task"],
+        examples=["ping your constellation", "report current status"],
     )
 
     security_scheme = SecurityScheme(
@@ -130,12 +163,12 @@ def build_app() -> Starlette:
     )
 
     public_agent_card = AgentCard(
-        name="astra-external-verification",
+        name="astra-external-task",
         description=(
             "Astra constellation external A2A endpoint. "
-            "Verifies external agent-to-agent connectivity."
+            "Dispatches external requests to the local Hermes agent for execution."
         ),
-        version="0.0.1",
+        version="0.0.2",
         default_input_modes=["text/plain"],
         default_output_modes=["text/plain"],
         capabilities=AgentCapabilities(streaming=True, extended_agent_card=True),
@@ -151,7 +184,7 @@ def build_app() -> Starlette:
     )
 
     request_handler = DefaultRequestHandler(
-        agent_executor=VerificationAgentExecutor(),
+        agent_executor=DispatchAgentExecutor(),
         task_store=InMemoryTaskStore(),
         agent_card=public_agent_card,
         extended_agent_card=public_agent_card,
@@ -161,7 +194,7 @@ def build_app() -> Starlette:
     routes.extend(create_agent_card_routes(public_agent_card))
     routes.extend(create_jsonrpc_routes(request_handler, "/"))
 
-    middleware = [Middleware(APIKeyMiddleware, key=ACCESS_KEY)] if ACCESS_KEY else []
+    middleware = [Middleware(APIKeyMiddleware, peers=PEERS, single_key=ACCESS_KEY)]
     return Starlette(routes=routes, middleware=middleware)
 
 
