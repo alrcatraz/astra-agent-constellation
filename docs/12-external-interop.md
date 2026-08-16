@@ -358,9 +358,9 @@ did:wba 靠现场 HTTPS 解析调用方的 DID 文档。
   `@target-uri` 与服务端口径分裂。
 - **nginx `proxy_set_header` 是非继承的（本次部署实测根因）**：一旦某个
   `location` 内**写了任一** `proxy_set_header`，server 级定义的所有
-  `proxy_set_header` 对该 location **全部失效**。例如 HC01 曾把
-  `proxy_set_header Host $host;` 写进 `/rpc` location，导致 server 级的
-  `X-Forwarded-Proto https` 丢失 → 服务端重建出 `http://` → 与客户端签名的
+  `proxy_set_header` 对该 location **全部失效**。若把
+  `proxy_set_header Host $host;` 写进 `/rpc` location，server 级的
+  `X-Forwarded-Proto https` 就丢失 → 服务端重建出 `http://` → 与客户端签名的
   `https://<HOST>/rpc` 不匹配 → `Verification error: `（空描述，源自
   ECDSA InvalidSignature）。**修复**：`/rpc`（及任何需伪造信任头的 location）
   里不写 proxy_set_header，让 server 级的 Host/X-Forwarded-Proto/-For 完整继承；
