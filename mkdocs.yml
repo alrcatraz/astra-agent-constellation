@@ -69,6 +69,8 @@ nav:
       - 看护者操作手册: 08-guardian-runbook.md
       - 演练剧本: 09-game-day.md
       - ACP 内容映射: 10-acp-mapping.md
+      - 总是知晓: 11-always-aware.md
+      - 对外互操作: 12-external-interop.md
   - 采纳路径: 07-adoption.md
   - 决策记录:
       - references/0001-agent-platform-selection.md
