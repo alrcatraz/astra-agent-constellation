@@ -105,3 +105,52 @@ https://{agent}.{public-domain}/                               # A2A JSON-RPC �
   域名在 reload 时解析一次，主地址不可达自动切 backup。
 - 对外门面全链路已在外部网络实测通过：DNS → 对外入口 → HTTPS → 反向
   代理 → overlay 多级回程 → 成员端点；AgentCard 与能力文档响应符合预期。
+
+## 12.9 DID-WBA 身份层（落地要点，2026-08-16 核实）
+
+当身份/信任层启用 **did:wba**（DID Web 绑定网络解析）时，ANP 签名验证
+从「本地预共享 DID 文档」演进为「对端 did:wba 域名身份 + HTTPS 网络解析」。
+本节记通用落地要点（不对应任何具体 agent）。
+
+### 12.9.1 形态与职责
+
+- **身份形态**：`did:wba:<hostname>`，其中 `<hostname>` 是 DID 文档可被
+  HTTPS 解析的域名（常与对外子域一致，`https://<hostname>/.well-known/did.json`）。
+- **职责分离**：A2A 承担对话，ANP 承担信任；信任层升级为 did:wba 后，对端
+  不再依赖本地预共享身份，而是**现场网络解析对方 DID 文档**完成认证。
+- **原生 verifier**：服务端启用 `enable_auth_middleware` 后，OpenANP 原生
+  `DidWbaVerifier` 会对对端 did:wba 身份做真实 HTTPS 解析（不是本地查表）。
+
+### 12.9.2 身份密钥选型（防踩坑）
+
+| 组件 | 推荐 | 忌讳 | 原因 |
+|:--|:--|:--|:--|
+| DID 文档签名 key | **k1 profile**（secp256k1 / JWK） | e1（Ed25519 / Multikey） | 原生 verifier 对 Multikey 有算法推断 bug |
+| JWT / HTTP 签名密钥 | **ES256（EC P-256）** | RSA | verifier 内部按 EC 算法强校验，RSA 密钥报 `RSAPrivateKey` |
+
+### 12.9.3 公开解析约束
+
+- **DID 文档必须公开可达**，且不落鉴权：`/.well-known/did.json` 与
+  `/{agent}/did.json` 由反向代理暴露；RPC 面仍鉴权，仅身份解析公开。
+  注：部分框架（OpenANP）的鉴权豁免路径列表不含 did.json，需在应用层
+  加「公开路径中间件」放行身份文档（不影响 RPC 鉴权）。
+- **反向代理必须透传 Host**（`proxy_set_header Host $host`），否则对端用
+  upstream 名/内部名当 authority 重建签名 URL，验签失败。
+- **签名 URL 必须匹配服务端重建形态**：服务端从 Host 头重建请求 URL
+  （内部常为 `http://<host>/rpc`），客户端签名覆盖的 URL 必须与之逐字一致
+  （对外 wire 仍 HTTPS，方案 / 端口不必一致）。
+
+### 12.9.4 对端要求
+
+- 原生 did:wba verifier **只接受 `did:wba:` 身份**；`did:all` 等旧身份会被
+  拒绝（"must start with 'did:wba:'"）。启用 did:wba 前，在线对端须先迁移
+  为 did:wba（各自域名可解析其 DID 文档），否则协作中断。
+- 对端 verifier 会对你的域名做真实 HTTPS 解析——因此对外子域 + 证书
+  （12.6）是 did:wba 的前提，不只是反代路径问题。
+
+### 12.9.5 测试客户端提示
+
+- 走 HTTPS 门面验证签名闭环时，注意客户端实现差异：部分 stdlib 客户端
+  （如 urllib）经反向代理转发时**请求体可能丢失**（Content-Digest 验签
+  失败），真实对端（HTTPX / curl 样式）无此问题。诊断时先确认后端实际
+  收到的 body 长度与摘要，再归因服务器或客户端。
