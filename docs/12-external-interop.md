@@ -134,11 +134,16 @@ https://{agent}.{public-domain}/                               # A2A JSON-RPC �
   `/{agent}/did.json` 由反向代理暴露；RPC 面仍鉴权，仅身份解析公开。
   注：部分框架（OpenANP）的鉴权豁免路径列表不含 did.json，需在应用层
   加「公开路径中间件」放行身份文档（不影响 RPC 鉴权）。
-- **反向代理必须透传 Host**（`proxy_set_header Host $host`），否则对端用
-  upstream 名/内部名当 authority 重建签名 URL，验签失败。
-- **签名 URL 必须匹配服务端重建形态**：服务端从 Host 头重建请求 URL
-  （内部常为 `http://<host>/rpc`），客户端签名覆盖的 URL 必须与之逐字一致
-  （对外 wire 仍 HTTPS，方案 / 端口不必一致）。
+- **反向代理必须透传 Host 与 X-Forwarded-Proto**（server 级
+  `proxy_set_header Host $host;` + `proxy_set_header X-Forwarded-Proto https;`），
+  否则对端用 upstream 名/内部名当 authority、或把对外 https 建回 http 重建
+  签名 URL，验签失败。**注意 `proxy_set_header` 非继承**：location 内写了任一
+  proxy_set_header 会让 server 级全部失效（见 12.11.4），`/rpc` location 内
+  不要写。
+- **签名 URL 必须匹配服务端重建形态**：服务端经 uvicorn `proxy_headers=True`
+  读 X-Forwarded-Proto 以对外 HTTPS wire 形态重建请求 URL
+  （`https://<HOST>/rpc`），客户端签名覆盖的 URL 必须与之逐字一致（见
+  12.10.4 示例，直接签对外 https 形态最稳健）。
 
 ### 12.9.4 对端要求
 
@@ -240,7 +245,12 @@ curl -s -H "X-API-Key: $KEY" "https://<HOST>/.well-known/agent.json" \
 ANP 用 **did:wba 身份 + RFC 9421 HTTP 签名**。签名覆盖请求方法、
 `@target-uri`、`content-digest` 等；服务端从 Host 头重建实际 URL 验签。
 **客户端必须对 `@target-uri` 与「服务端会重建的形态」逐字一致**
-（见 12.9.3）；对外 wire 是 HTTPS，签名 URL 常用内部 http scheme。
+（见 12.9.3）。**推荐直接用对外 HTTPS wire 形态签名**：客户端签
+`https://<HOST>/rpc`，服务端经 nginx 透传 `X-Forwarded-Proto: https`
+（`proxy_headers=True`）重建相同的 `https://<HOST>/rpc`——wire 与签名一致，
+最稳健。不要用"内部 http scheme"，它会让签名 URL 与对外形态分裂，一旦
+反代未透传 X-Forwarded-Proto，服务端重建回 `http://` 即验签失败（见
+12.11.4 的 nginx 非继承陷阱）。
 
 ```python
 import base64, json, time
@@ -254,8 +264,9 @@ priv      = serialization.load_pem_private_key(
     open("<PATH>/key-1_priv.pem", "rb").read(), password=None)
 did       = did_doc["id"]
 
-# 2) 目标：内部 http scheme 的签名 URL（须与服务端重建形态一致）
-url  = f"http://<HOST>/rpc"
+# 2) 目标：签名 URL 用对外 HTTPS wire 形态（须与服务端经 X-Forwarded-Proto
+#    重建的形态一致；nginx 必须透传 X-Forwarded-Proto: https，见 12.11.4）
+url  = f"https://<HOST>/rpc"
 
 # 3) 请求体：JSON-RPC 格式，method 取 ad.json 里登记的接口
 body = b'{"jsonrpc":"2.0","id":1,"method":"<METHOD>","params":{"<K>":"<V>"}}'
@@ -289,8 +300,116 @@ print(r.stdout[:400])
 | `RSAPrivateKey` / 验签算法不符 | 签名密钥用了 RSA，或 e1/Multikey 推断 bug | 用 k1(secp256k1) 身份 + ES256 签名（12.9.2） |
 | Content-Digest 失败但 body 正常 | 客户端只摘要了 body，没覆盖签名字段；或 urllib body 经反代丢失 | 用 `generate_http_signature_headers` 带 `body=`；换 httpx/curl 客户端（12.9.5） |
 | "All connection attempts failed"（A2A） | client 连卡片声明的 URL，与服务端实际端口不符 | 服务端 `CARD_URL` 与端口一致 |
-| 签名 URL 不匹配 | 客户端签的 `@target-uri` 与服务端重建的形态不一致 | 统一为内部 http scheme、`<HOST>` 走 Host 透传（12.9.3） |
+| 签名 URL 不匹配 | 客户端签的 `@target-uri` 与服务端重建的形态不一致 | 双方统一用对外 `https://<HOST>/rpc`；nginx 透传 Host + X-Forwarded-Proto（勿在 location 内覆盖 proxy_set_header，12.9.3/12.11.4） |
 | 404（ad.json/did.json） | 公开身份文档未挂载/被鉴权拦截 | 应用层加「公开路径中间件」放行身份文档，仅 RPC 面鉴权（12.9.3） |
 
 > 本手册与 docs/12 其余部分同属**通用蓝图**：不含任何特定 agent 的
 > 真实域名、DID 或密钥。具体某个成员的登记值属私有边界，见部署方。
+
+## 12.11 从 phase1 升级到真 did:wba（操作清单，2026-08-16 验证）
+
+当某成员 ANP 服务当前跑 **phase1（预共享信任 DID 目录）**，要升级为
+**真 DID-WBA（原生 DidWbaVerifier 现场网络解析对端 did:wba 身份）**时，
+按此清单执行。核心是**信任模型反转**：phase1 靠本地 `trusted-dids/` 查表，
+did:wba 靠现场 HTTPS 解析调用方的 DID 文档。
+
+### 12.11.1 前置核查（缺一个切了必败）
+- 公网 HTTPS 门面已挂该成员子域，且 `agent/did.json`、`/.well-known/did.json`、
+  `agent/ad.json` 从公网**实测全部 200**（对外子域 + 证书是 did:wba 的前提，
+  不只是反代路径问题，12.9.4）。
+- 服务代码支持 didwba 分支（`ANP_AUTH_MODE` 开关 + `enable_auth_middleware`，
+  FastANP 原生 `DidWbaVerifier`）。
+- nginx 已透传 Host 与 X-Forwarded-Proto 到本成员（server 级
+  `proxy_set_header Host $host;` + `X-Forwarded-Proto https;`，且 `/rpc`
+  location 内**不写**任何 proxy_set_header——非继承规则会丢弃 server 级的
+  X-Forwarded-Proto，导致服务端重建出 http、与客户端 https 签名不匹配，
+  见 12.11.4 实测坑）。
+- `ANP_ALLOWED_DOMAINS` 含该成员自己的对外域名。
+
+### 12.11.2 迁移步骤（对齐已验证形态）
+1. 备份：`keys/` 目录 + systemd unit 全备（change-safeguard 三档备份）。
+2. **k1 身份重生成**：用 `create_did_wba_document(did_profile="k1")` 重生成
+   did:wba 身份（参考已验证成员的 `gen_did_wba_k1.py`），把 DID 文档的
+   `key-1` 从 Multikey 换成 `EcdsaSecp256k1VerificationKey2019`
+   （secp256k1/JWK）——见 12.9.2 密钥选型红线。
+3. **生成 ES256 JWT 密钥对**（`jwt_private.pem` + `jwt_public.pem`，
+   NIST P-256）放进 `ANP_KEYS_DIR` 或 `~/.anp`——didwba 启动**硬性要求**，
+   缺则 `RuntimeError` 拒启。
+4. 改 unit `ANP_AUTH_MODE=phase1` → `didwba`，`daemon-reload` + 重启。
+5. 确认服务 active + 端口监听。
+
+### 12.11.3 验收（必须跨机真握手，非自闭环）
+- 公网 did.json 的 `key-1` 现为 `EcdsaSecp256k1VerificationKey2019`（非 Multikey）。
+- 未签名调用 `/rpc` → **401**（鉴权已激活）。
+- **跨机签名闭环**：用另一台已 did:wba 成员的身份密钥（它自己的
+  `did_wba_key-1_priv.pem` + did 文档）经公网门面签名调该成员 `/rpc` echo，
+  期望 `HTTP 200` + `result.message` 含 `external-anp-ok`。verifier 现场网络
+  解析调用方 did:wba 身份并验签通过，即证明**真 DID-WBA** 生效（12.10.4
+  的 `generate_http_signature_headers` 客户端可用，keyid 取 did 文档第一个
+  verificationMethod 的 `#key-1`）。
+
+### 12.11.4 陷阱 / 红线（承接 12.9.2）
+- 身份密钥必须 **k1 (secp256k1/JWK)**；Multikey/Ed25519（e1）触发 verifier
+  算法推断 bug。JWT/签名密钥必须 **ES256 (EC P-256)**；RSA 报 `RSAPrivateKey` 拒验。
+- **签名 URL 用对外 HTTPS wire 形态，nginx 必须透传 `X-Forwarded-Proto: https`**：
+  客户端签 `https://<HOST>/rpc`，服务端 uvicorn `proxy_headers=True` +
+  `forwarded_allow_ips="*"` 读到 X-Forwarded-Proto 后用 `https` 重建
+  `@target-uri`——两边逐字一致。**严禁用"内部 http scheme"签名**，那会让
+  `@target-uri` 与服务端口径分裂。
+- **nginx `proxy_set_header` 是非继承的（本次部署实测根因）**：一旦某个
+  `location` 内**写了任一** `proxy_set_header`，server 级定义的所有
+  `proxy_set_header` 对该 location **全部失效**。例如 HC01 曾把
+  `proxy_set_header Host $host;` 写进 `/rpc` location，导致 server 级的
+  `X-Forwarded-Proto https` 丢失 → 服务端重建出 `http://` → 与客户端签名的
+  `https://<HOST>/rpc` 不匹配 → `Verification error: `（空描述，源自
+  ECDSA InvalidSignature）。**修复**：`/rpc`（及任何需伪造信任头的 location）
+  里不写 proxy_set_header，让 server 级的 Host/X-Forwarded-Proto/-For 完整继承；
+  确需覆盖某个头时，把 server 级全部 proxy_set_header 一并复制进该 location。
+- 升级切 did:wba 会**替换该成员 did:wba 公钥**——若有真实公网 peer 已缓存
+  旧 key 会短暂失效；phase1 阶段通常无公网 peer，无影响，升级前确认。
+
+## 12.12 把外部任务派发到本机 Hermes（dispatch 桥，v0.2.6）
+
+外部 A2A/ANP 端点只做**入站鉴权与身份解析**，真正的任务执行由**本机自己的
+Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/external-interop/`
+的 `dispatch.py` 就是这座单跳桥：
+
+```text
+外部方 --A2A(9910)/ANP(9911)--> 端点(验身份) --dispatch.py--> hermes -z
+         （DID / peer 身份注入 prompt） <--------- 本机智能体执行 ---------
+                                         最终回复返给外部方
+```
+
+### 12.12.1 设计要点
+
+- **执行引擎是本机 Hermes**：`dispatch.run_hermes_oneshot(task, identity)`
+  调用 `hermes -z`（官方一次性脚本通道），把任务文本 + 已验证的外部方身份
+  拼成 prompt，取最终回复返回。**无网络中继、无跨端口代理**——本机 hermes
+  是唯一执行器。
+- **身份透传是核心**：外部鉴权层解析出的真实身份（ANP 的 `Context.did`
+  / A2A 的 `peer_name`）作为一行上下文注入 prompt，让本机智能体**能区分
+  "这是哪个外部方"**，而不是笼统的"外部"——支撑按 peer 的授权/审计。
+- **机器无关模板**：`dispatch.py` 不含任何机器特定值，全部经环境变量注入
+  （`HERMES_DISPATCH_BIN` / `HERMES_DISPATCH_PROFILE` / `HERMES_DISPATCH_WORKDIR`
+  / `DISPATCH_IDENTITY_LABEL`）。同一模板原样装在每台成员机器。
+
+### 12.12.2 接通矩阵（端点 → dispatch）
+
+| 端点 | 鉴权 | 取身份 | 注入的 identity | 返回 |
+|:--|:--|:--|:--|:--|
+| A2A `POST /` (9910) | `X-API-Key`（单 key 或 `EXTERNAL_A2A_PEERS` 每 peer 一 key） | `EXTERNAL_A2A_PEERS` 命中 → `request.state.peer_name`；单 key → `"external"` | `peer_name` | 本机 Hermes 最终回复（agent artifact） |
+| ANP `POST /rpc` `/task` (9911) | RFC 9421 签名 + did:wba | 验签通过的 `Context.did` | `context.did` | `{"message": <回复>, "origin_did": <DID>}` |
+
+### 12.12.3 部署要点（生产 unit）
+
+- 生产 systemd unit 的 `ExecStart` **指向私有副本**（`~/astra/external-interop/`
+  ，含机器真实值），**不直接指向 git 模板目录**；模板只作 git 单一来源
+  （AGENTS「deployment specifics go to the private copy」）。
+- **必须显式设 `HERMES_DISPATCH_BIN` 为绝对路径**（systemd user 环境默认
+  PATH 不含 `~/.local/bin`，不设会 `FileNotFoundError`）。
+- 端点监听：对外 9910/9911 绑 0.0.0.0；**内部 hermes A2A（9900）应只绑
+  127.0.0.1**，与对外端口物理分隔，且 9900 永不经公网反代暴露。
+- 部署后跨机验收：用另一台已 did:wba 成员的身份（它自己的 key + did 文档）
+  经**公网**门面签调用 `/rpc` `/task`，期望 200 + `result.message` = 本机
+  hostname 类真实执行输出 + `origin_did` = 调用方 DID（12.11.3 的闭环，但
+  任务改为真执行而非 echo）。
