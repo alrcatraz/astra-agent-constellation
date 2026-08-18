@@ -109,15 +109,15 @@ https://{agent}.{public-domain}/                               # A2A JSON-RPC �
 ## 12.9 DID-WBA 身份层（落地要点，2026-08-16 核实）
 
 当身份/信任层启用 **did:wba**（DID Web 绑定网络解析）时，ANP 签名验证
-从「本地预共享 DID 文档」演进为「对端 did:wba 域名身份 + HTTPS 网络解析」。
-本节记通用落地要点（不对应任何具体 agent）。
+使用**对端 did:wba 域名身份 + HTTPS 网络解析**，不依赖任何本地预共享
+DID 目录。本节记通用落地要点（不对应任何具体 agent）。
 
 ### 12.9.1 形态与职责
 
 - **身份形态**：`did:wba:<hostname>`，其中 `<hostname>` 是 DID 文档可被
   HTTPS 解析的域名（常与对外子域一致，`https://<hostname>/.well-known/did.json`）。
-- **职责分离**：A2A 承担对话，ANP 承担信任；信任层升级为 did:wba 后，对端
-  不再依赖本地预共享身份，而是**现场网络解析对方 DID 文档**完成认证。
+- **职责分离**：A2A 承担对话，ANP 承担信任；信任层统一为 did:wba 后，对端
+  不依赖任何本地预共享身份，而是**现场网络解析对方 DID 文档**完成认证。
 - **原生 verifier**：服务端启用 `enable_auth_middleware` 后，OpenANP 原生
   `DidWbaVerifier` 会对对端 did:wba 身份做真实 HTTPS 解析（不是本地查表）。
 
@@ -306,19 +306,19 @@ print(r.stdout[:400])
 > 本手册与 docs/12 其余部分同属**通用蓝图**：不含任何特定 agent 的
 > 真实域名、DID 或密钥。具体某个成员的登记值属私有边界，见部署方。
 
-## 12.11 从 phase1 升级到真 did:wba（操作清单，2026-08-16 验证）
+## 12.11 启用真 did:wba（操作清单，2026-08-16 验证）
 
-当某成员 ANP 服务当前跑 **phase1（预共享信任 DID 目录）**，要升级为
-**真 DID-WBA（原生 DidWbaVerifier 现场网络解析对端 did:wba 身份）**时，
-按此清单执行。核心是**信任模型反转**：phase1 靠本地 `trusted-dids/` 查表，
-did:wba 靠现场 HTTPS 解析调用方的 DID 文档。
+对外 ANP 成员的信任层**统一为真 DID-WBA**：身份 `did:wba:<hostname>`，由
+原生 `DidWbaVerifier` 现场 HTTPS 解析对端 DID 文档验证签名。**不再有
+phase1（本地预共享 DID 目录）过渡形态**——任何成员接入即按此清单启用
+`dnp` did:wba，核心是**信任模型**：对端身份靠现场网络解析，而非本地查表。
 
 ### 12.11.1 前置核查（缺一个切了必败）
 - 公网 HTTPS 门面已挂该成员子域，且 `agent/did.json`、`/.well-known/did.json`、
   `agent/ad.json` 从公网**实测全部 200**（对外子域 + 证书是 did:wba 的前提，
   不只是反代路径问题，12.9.4）。
-- 服务代码支持 didwba 分支（`ANP_AUTH_MODE` 开关 + `enable_auth_middleware`，
-  FastANP 原生 `DidWbaVerifier`）。
+- 服务代码启用 didwba 分支（`enable_auth_middleware` + 原生
+  `DidWbaVerifier`，见 `templates/external-interop/anp_server_main.py`）。
 - nginx 已透传 Host 与 X-Forwarded-Proto 到本成员（server 级
   `proxy_set_header Host $host;` + `X-Forwarded-Proto https;`，且 `/rpc`
   location 内**不写**任何 proxy_set_header——非继承规则会丢弃 server 级的
@@ -326,16 +326,17 @@ did:wba 靠现场 HTTPS 解析调用方的 DID 文档。
   见 12.11.4 实测坑）。
 - `ANP_ALLOWED_DOMAINS` 含该成员自己的对外域名。
 
-### 12.11.2 迁移步骤（对齐已验证形态）
+### 12.11.2 接入步骤（对齐已验证形态）
 1. 备份：`keys/` 目录 + systemd unit 全备（change-safeguard 三档备份）。
-2. **k1 身份重生成**：用 `create_did_wba_document(did_profile="k1")` 重生成
+2. **k1 身份生成**：用 `create_did_wba_document(did_profile="k1")` 生成
    did:wba 身份（参考已验证成员的 `gen_did_wba_k1.py`），把 DID 文档的
-   `key-1` 从 Multikey 换成 `EcdsaSecp256k1VerificationKey2019`
+   `key-1` 设为 `EcdsaSecp256k1VerificationKey2019`
    （secp256k1/JWK）——见 12.9.2 密钥选型红线。
 3. **生成 ES256 JWT 密钥对**（`jwt_private.pem` + `jwt_public.pem`，
    NIST P-256）放进 `ANP_KEYS_DIR` 或 `~/.anp`——didwba 启动**硬性要求**，
    缺则 `RuntimeError` 拒启。
-4. 改 unit `ANP_AUTH_MODE=phase1` → `didwba`，`daemon-reload` + 重启。
+4. 确认服务以 didwba 信任模型启动（模板 `anp_server_main.py` 恒定
+   `enable_auth_middleware=True`，无 phase1 分支），`daemon-reload` + 重启。
 5. 确认服务 active + 端口监听。
 
 ### 12.11.3 验收（必须跨机真握手，非自闭环）
@@ -365,8 +366,6 @@ did:wba 靠现场 HTTPS 解析调用方的 DID 文档。
   ECDSA InvalidSignature）。**修复**：`/rpc`（及任何需伪造信任头的 location）
   里不写 proxy_set_header，让 server 级的 Host/X-Forwarded-Proto/-For 完整继承；
   确需覆盖某个头时，把 server 级全部 proxy_set_header 一并复制进该 location。
-- 升级切 did:wba 会**替换该成员 did:wba 公钥**——若有真实公网 peer 已缓存
-  旧 key 会短暂失效；phase1 阶段通常无公网 peer，无影响，升级前确认。
 
 ## 12.12 把外部任务派发到本机 Hermes（dispatch 桥，v0.2.6）
 

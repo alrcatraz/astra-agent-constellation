@@ -9,31 +9,23 @@ The FastANP integration mounts the standard ANP discovery/RPC endpoints:
   /agent/did.json       -> DID document (DID-WBA identity, public)
   /.well-known/did.json -> DID document (standard did:wba resolution, public)
 
-Authentication (two-phase, switchable via ANP_AUTH_MODE):
-  phase-1 (default): HTTP Message Signature (RFC 9421) verified against
-      pre-shared DID documents in ANP_TRUSTED_DIDS_DIR. Works over plain
-      HTTP + bare IP, no TLS/dns resolution needed. Tolerates did:all peers.
-  phase-2: full OpenANP DID-WBA (`did:wba:<domain>`). The native
-      `DidWbaVerifier` middleware resolves each peer's DID document over
-      HTTPS and verifies signatures network-wise. Enabled via
-      ANP_AUTH_MODE=didwba. NOTE: native verifier only accepts did:wba
-      peers — any did:all peer (e.g. a pre-migration test peer) will be
-      401. Migrate peers to did:wba before switching.
+Authentication is full OpenANP DID-WBA (`did:wba:<domain>`): the native
+`DidWbaVerifier` middleware resolves each peer's DID document over HTTPS and
+verifies signatures network-wise (`enable_auth_middleware=True`). The native
+verifier only accepts did:wba peers — any did:all peer is 401. There is no
+phase-1 (pre-shared trust) fallback; did:wba is the only trust mode.
 
 DID-WBA identity is served *publicly* (standard requires it): the
 public-paths pre-middleware short-circuits /agent/did.json and
-/.well-known/did.json so discovery + DID resolve work WITHOUT auth even
-when phase-2 native middleware would otherwise guard them. Everything else
-is authenticated.
+/.well-known/did.json so discovery + DID resolve work WITHOUT auth even when
+the native middleware would otherwise guard them. Everything else is
+authenticated.
 
 All machine/instance-specific values are injected via environment
 variables -- nothing hard-coded. Defaults are placeholders for the public
 template.
-
-Run:
-    ANP_AUTH_MODE=phase1 ANP_TRUSTED_DIDS_DIR=/path/to/trusted-dids \\
-        ANP_KEYS_DIR=/path/to/keys <venv>/bin/python anp_server_main.py
 """
+
 import json
 import os
 
@@ -52,7 +44,6 @@ DID = os.environ.get(
     "EXTERNAL_ANP_DID",
     "did:wba:<FACADE-DOMAIN>",
 )
-AUTH_MODE = os.environ.get("ANP_AUTH_MODE", "phase1")  # phase1 | didwba
 
 # Paths that MUST stay publicly resolvable (DID-WBA reaches them without auth).
 PUBLIC_PATHS = {
@@ -70,19 +61,12 @@ def _load_did_document() -> dict | None:
     if os.path.isfile(doc_path):
         with open(doc_path, encoding="utf-8") as fh:
             return json.load(fh)
-    # Fall back to the legacy did:all document for phase-1.
-    legacy = os.path.join(KEYS_DIR, "did_document.json")
-    if os.path.isfile(legacy):
-        with open(legacy, encoding="utf-8") as fh:
-            return json.load(fh)
     return None
 
 
 def build_app() -> FastAPI:
     app = FastAPI(title="astra-external-anp")
 
-    enable_native = AUTH_MODE == "didwba"
-    trusted_dids_dir = os.environ.get("ANP_TRUSTED_DIDS_DIR", "~/.anp/trusted-dids")
     allowed_domains = [
         d.strip()
         for d in os.environ.get("ANP_ALLOWED_DOMAINS", "").split(",")
@@ -103,22 +87,9 @@ def build_app() -> FastAPI:
         ),
         agent_domain=f"https://{allowed_domains[0]}" if allowed_domains else "<DOMAIN>",
         did=did,
-        enable_auth_middleware=enable_native,
-        auth_config=_native_auth_config(trusted_dids_dir, allowed_domains)
-        if enable_native
-        else None,
+        enable_auth_middleware=True,
+        auth_config=_native_auth_config(allowed_domains),
     )
-
-    if AUTH_MODE == "phase1":
-        from anp_auth import build_http_signature_middleware
-
-        app.add_middleware(
-            starlette.middleware.base.BaseHTTPMiddleware,
-            dispatch=build_http_signature_middleware(
-                trusted_dids_dir=os.path.expanduser(trusted_dids_dir),
-                allowed_domains=allowed_domains or None,
-            ),
-        )
 
     @anp.interface("/echo", description="Echo a string back to verify ANP connectivity.")
     async def echo(text: str = "") -> dict:
@@ -190,8 +161,8 @@ def build_app() -> FastAPI:
     return app
 
 
-def _native_auth_config(trusted_dids_dir: str, allowed_domains: list[str]):
-    """Build DidWbaVerifierConfig for phase-2 native verification."""
+def _native_auth_config(allowed_domains: list[str]):
+    """Build DidWbaVerifierConfig for native DID-WBA verification."""
     from anp.authentication.did_wba_verifier import DidWbaVerifierConfig
 
     keys_dir = os.path.expanduser(KEYS_DIR)
@@ -207,7 +178,7 @@ def _native_auth_config(trusted_dids_dir: str, allowed_domains: list[str]):
             break
     if not (jwt_priv and jwt_pub):
         raise RuntimeError(
-            "phase-2 DID-WBA requires jwt_private.pem + jwt_public.pem in "
+            "DID-WBA requires jwt_private.pem + jwt_public.pem in "
             f"ANP_KEYS_DIR or ~/.anp (found none in {KEYS_DIR})"
         )
 
