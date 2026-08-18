@@ -9,3 +9,5 @@ __pycache__/
 PLAN.md
 agent-registry/
 tasks/
+docs/10-acp-mapping.md
+skills/astra-agent-constellation/references/a2a-interop.md
