@@ -8,9 +8,8 @@
 | 文件 | 作用 |
 |:--|:--|
 | `a2a_server_main.py` | **对外 A2A 端点**（A2A v1.0 JSON-RPC + AgentCard），收到任务转给本机 Hermes 智能体执行。 |
-| `anp_server_main.py` | **对外 ANP 端点**（OpenANP，`/agent/ad.json`、`/rpc`、`/agent/did.json`），`/task` 方法转给本机 Hermes 智能体执行。 |
+| `anp_server_main.py` | **对外 ANP 端点**（OpenANP，`/agent/ad.json`、`/rpc`、`/agent/did.json`），`/task` 方法转给本机 Hermes 智能体执行。信任层统一为 did:wba。 |
 | `dispatch.py` | **本机 Hermes 派发桥**：把外部任务（带已验证的外部方身份）经 `hermes -z` 单跳交给本机智能体执行并返回结果。 |
-| `anp_auth.py` | ANP 端点用 HTTP Message Signature（RFC 9421）鉴权中间件，验证方来自预共享 DID 文档目录（Phase-1，免 HTTPS/DNS）。 |
 
 ## 运行
 
@@ -36,8 +35,6 @@ export EXTERNAL_CARD_URL=https://<public-host>:<port>   # 对外可达的 AgentC
 export EXTERNAL_ANP_PORT=9911
 export EXTERNAL_ANP_NAME=<对外展示名>
 export EXTERNAL_ANP_DID=did:wba:<domain>
-export ANP_AUTH_MODE=phase1|didwba
-export ANP_TRUSTED_DIDS_DIR=<可信对端 DID 文档目录>
 export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>
 
 <venv>/bin/python a2a_server_main.py   # 启动 A2A 端点
@@ -59,6 +56,7 @@ export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>
 - **A2A**：`EXTERNAL_A2A_KEY`（或 `EXTERNAL_A2A_PEERS` 每 peer 一 key）有值时
   启用 X-API-Key 鉴权（错误/缺失 → 401）。命中 PEERS 的调用方以该 peer 名
   作为身份透传给本机 Hermes。
-- **ANP**：`ANP_AUTH_MODE=phase1`（预共享 DID 目录）或 `didwba`（真 DID-WBA，
-  现场网络解析，需公网子域 + 证书，推荐）。phase1 无签/错签 401；didwba
-  未签名/错签名 403+签验。完整接入见 docs/12 §12.10-12.12。
+- **ANP**：**did:wba only**（不再有 phase1 预共享形态）。原生 `DidWbaVerifier`
+  现场网络解析对端 did:wba 身份并验签；未签名/错签名 401（`"must start with
+  'did:wba:'"`）。需要公网子域 + 证书（身份文档须公开可达）。完整接入见
+  docs/12 §12.10-12.12。
