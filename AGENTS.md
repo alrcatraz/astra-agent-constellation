@@ -145,6 +145,29 @@ that track.)
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
+4b. **Public reconcile trap**: if the GitHub `development` branch has
+   diverged from the freshly-rebuilt `public` (e.g. older public commits were
+   already merged into GitHub `main`), a PR `development → main` will refuse
+   to merge (non-fast-forward) and a naive `git merge github/main` back into
+   `public` silently **re-imports the leak set** (the machine-name/port-plan
+   files listed in step 4 above). Correct reconcile when histories fork —
+   push the sanitised tree onto GitHub `main`'s history, resolving content
+   to the NEW public side:
+   ```
+   # (1) user-ok'd force: bring GitHub development to the new sanitised tree
+   git push --force-with-lease github public:development
+   # (2) rebase-style reconcile so the PR can merge; -X ours = new/scrubbed wins
+   git checkout public
+   git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
+   # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
+   git rm --cached <the-file-that-reappeared> ...
+   git grep -nE "<HOST-N>|<machine-abbrev>|<internal-domain>" -- # must be empty
+   git commit -S -m "chore: purge leak re-import (sanitised)"
+   git push github public:development                    # now fast-forward
+   ```
+   A file present on GitHub is NOT a license to keep it there — treat
+   "public has it" as a bug to purge, not a signal to preserve. Force-pushes
+   on GitHub require explicit user approval (see Rules).
 5. **Publish public track**: `git push github public:development`.
 5b. **Advance GitHub `main` by PR**: open a pull request
    `development` → `main` on GitHub and merge it (`gh pr create` +
