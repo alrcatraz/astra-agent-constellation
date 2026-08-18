@@ -137,3 +137,13 @@
   同意（13.4）才改配置。
 - A2A 会话持久化档案用于审计与召回：`a2a_history` 可跨会话读对话；
   测试用 context 完成后 MUST 清理，但审计留痕（append-only）应保留。
+- **Anti-loop 护栏**：单 context 的 ping-pong 轮次上限由
+  `A2A_MAX_PINGPONG_TURNS`（默认 5）限制，避免 agent↔agent 死循环；
+  合理的长协作可提高该值或换新 context_id。
+- **端口规划**（勿混淆）：Hermes 内部 A2A = **9900**；9901/9119 是其他
+  角色（父端 serve / dashboard）；对外 A2A/ANP = **9910/9911**（主宿）。
+- **自检命令**：规划 A2A 调用前
+  `curl 127.0.0.1:9900/.well-known/agent-card.json` 返回 agent card，
+  `agent.url` 即自环 `a2a_call` 的目标。
+- **确定性 context_id**：项目会话用固定的 `project-core`/`project-modA` 等
+  作为 context_id，使 `a2a_history`/`a2a_call` 可预期、跨重启存活。
