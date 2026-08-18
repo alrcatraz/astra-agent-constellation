@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 *.db
 .DS_Store
+
+# Private-only content — MUST stay off the public (GitHub) track.
+PLAN.md
+agent-registry/
+tasks/
