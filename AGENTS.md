@@ -175,10 +175,13 @@ that track.)
    public track's stable head.
 6. **Tag both tracks**: annotated, GPG-signed `git tag -s vX.Y.Z` on local
    `main` and on `public`. Push the tag to both remotes.
-7. **GitHub release**: `gh release create v0.2.3 --title "v0.2.3"` — **the
-   release title is ONLY the version string**, nothing else (no description,
-   no changelog, no prefix). A bare tag name as the whole title. (This is a
-   documented recurring mistake in another project — do not repeat it.)
+7. **GitHub release**: `gh release create v0.2.7 --title "v0.2.7" --notes-file
+   /tmp/notes.md` — **the release title is ONLY the version string**, nothing
+   else (no description, no changelog, no prefix). A bare tag name as the whole
+   title. **The release BODY (Release Note) is separate and expected**: write a
+   structured changelog of what changed in `--notes`/`--notes-file`. Title =
+   version only; Body = notes. (Title-only-empty-body is as much a mistake as a
+   prefixed title — both were recurring errors.)
 
 ### Rules
 
