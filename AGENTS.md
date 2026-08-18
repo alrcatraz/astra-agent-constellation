@@ -140,11 +140,34 @@ that track.)
    # Public-safe additions to KEEP (written sanitised):
    #   docs/12-external-interop.md, templates/external-interop/*
    # Scan the staged tree for real host/IP/domain/machine-name hits
-   # (incl. any machine abbreviation such as <deployment host>) before committing.
+   # (incl. any machine abbreviation used in the private track) before committing.
    git commit -S -m "... (sanitised)"
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
+4b. **Public reconcile trap**: if the GitHub `development` branch has
+   diverged from the freshly-rebuilt `public` (e.g. older public commits were
+   already merged into GitHub `main`), a PR `development → main` will refuse
+   to merge (non-fast-forward) and a naive `git merge github/main` back into
+   `public` silently **re-imports the leak set** (the machine-name/port-plan
+   files listed in step 4 above). Correct reconcile when histories fork —
+   push the sanitised tree onto GitHub `main`'s history, resolving content
+   to the NEW public side:
+   ```
+   # (1) user-ok'd force: bring GitHub development to the new sanitised tree
+   git push --force-with-lease github public:development
+   # (2) rebase-style reconcile so the PR can merge; -X ours = new/scrubbed wins
+   git checkout public
+   git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
+   # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
+   git rm --cached <the-file-that-reappeared> ...
+   git grep -nE "<HOST-N>|<machine-abbrev>|<internal-domain>" -- # must be empty
+   git commit -S -m "chore: purge leak re-import (sanitised)"
+   git push github public:development                    # now fast-forward
+   ```
+   A file present on GitHub is NOT a license to keep it there — treat
+   "public has it" as a bug to purge, not a signal to preserve. Force-pushes
+   on GitHub require explicit user approval (see Rules).
 5. **Publish public track**: `git push github public:development`.
 5b. **Advance GitHub `main` by PR**: open a pull request
    `development` → `main` on GitHub and merge it (`gh pr create` +
@@ -152,10 +175,13 @@ that track.)
    public track's stable head.
 6. **Tag both tracks**: annotated, GPG-signed `git tag -s vX.Y.Z` on local
    `main` and on `public`. Push the tag to both remotes.
-7. **GitHub release**: `gh release create v0.2.3 --title "v0.2.3"` — **the
-   release title is ONLY the version string**, nothing else (no description,
-   no changelog, no prefix). A bare tag name as the whole title. (This is a
-   documented recurring mistake in another project — do not repeat it.)
+7. **GitHub release**: `gh release create v0.2.7 --title "v0.2.7" --notes-file
+   /tmp/notes.md` — **the release title is ONLY the version string**, nothing
+   else (no description, no changelog, no prefix). A bare tag name as the whole
+   title. **The release BODY (Release Note) is separate and expected**: write a
+   structured changelog of what changed in `--notes`/`--notes-file`. Title =
+   version only; Body = notes. (Title-only-empty-body is as much a mistake as a
+   prefixed title — both were recurring errors.)
 
 ### Rules
 
@@ -183,7 +209,7 @@ HERMES_COPILOT_ACP_COMMAND="bash"
 HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
 ```
 
-- Local (<deployment host>): command above. Remote (<build host>): same via
+- Local (`<HOST-1>`): command above. Remote (`<BUILD-HOST>`): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -192,7 +218,7 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/exa
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
 - dsh sandbox (workspace-write) has no headless ask-hang; verified local
-  (<deployment host>) and remote (<build host>). Deployment manual:
+  (`<HOST-1>`) and remote (`<BUILD-HOST>`). Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official
