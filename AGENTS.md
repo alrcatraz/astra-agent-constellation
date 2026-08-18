@@ -145,6 +145,32 @@ that track.)
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
+4b. **Public reconcile trap (2026-08-18, v0.2.7)**: if the GitHub
+   `development` branch has diverged from the freshly-rebuilt `public`
+   (e.g. older public commits were already merged into GitHub `main`), a PR
+   `development → main` will refuse to merge (non-fast-forward) and a naive
+   `git merge github/main` back into `public` silently **re-imports the leak
+   set** (`docs/10-acp-mapping.md`, `skills/.../references/a2a-interop.md`,
+   `templates/cordis-executor.yml.example`,
+   `docs/references/0006-...inter-agent-protocol-selection.md`). This
+   happened once already. Correct reconcile when histories have forked —
+   push the sanitised tree onto GitHub `main`'s history, resolving content
+   to the NEW public side:
+   ```
+   # (1) user-ok'd force: bring GitHub development to the new sanitised tree
+   git push --force-with-lease github public:development
+   # (2) rebase-style reconcile so the PR can merge; -X ours = new/scrubbed wins
+   git checkout public
+   git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
+   # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
+   git rm --cached docs/10-acp-mapping.md ...          # whatever reappeared
+   git grep -nE "HC01|SUSETLearn00|homecentre|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
+   git commit -S -m "chore: purge leak re-import (sanitised)"
+   git push github public:development                    # now fast-forward
+   ```
+   A file present on GitHub is NOT a license to keep it there — treat
+   "public has it" as a bug to purge, not a signal to preserve. Force-pushes
+   on GitHub require explicit user approval (see Rules).
 5. **Publish public track**: `git push github public:development`.
 5b. **Advance GitHub `main` by PR**: open a pull request
    `development` → `main` on GitHub and merge it (`gh pr create` +
