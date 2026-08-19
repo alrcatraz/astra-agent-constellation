@@ -140,17 +140,20 @@ that track.)
    # Public-safe additions to KEEP (written sanitised):
    #   docs/12-external-interop.md, templates/external-interop/*
    # Scan the staged tree for real host/IP/domain/machine-name hits
-   # (incl. any machine abbreviation used in the private track) before committing.
+   # (incl. any machine abbreviation such as <deployment host>) before committing.
    git commit -S -m "... (sanitised)"
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
-4b. **Public reconcile trap**: if the GitHub `development` branch has
-   diverged from the freshly-rebuilt `public` (e.g. older public commits were
-   already merged into GitHub `main`), a PR `development → main` will refuse
-   to merge (non-fast-forward) and a naive `git merge github/main` back into
-   `public` silently **re-imports the leak set** (the machine-name/port-plan
-   files listed in step 4 above). Correct reconcile when histories fork —
+4b. **Public reconcile trap (2026-08-18, v0.2.7)**: if the GitHub
+   `development` branch has diverged from the freshly-rebuilt `public`
+   (e.g. older public commits were already merged into GitHub `main`), a PR
+   `development → main` will refuse to merge (non-fast-forward) and a naive
+   `git merge github/main` back into `public` silently **re-imports the leak
+   set** (`docs/10-acp-mapping.md`, `skills/.../references/a2a-interop.md`,
+   `templates/cordis-executor.yml.example`,
+   `docs/references/0006-...inter-agent-protocol-selection.md`). This
+   happened once already. Correct reconcile when histories have forked —
    push the sanitised tree onto GitHub `main`'s history, resolving content
    to the NEW public side:
    ```
@@ -160,8 +163,8 @@ that track.)
    git checkout public
    git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
    # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
-   git rm --cached <the-file-that-reappeared> ...
-   git grep -nE "<HOST-N>|<machine-abbrev>|<internal-domain>" -- # must be empty
+   git rm --cached docs/10-acp-mapping.md ...          # whatever reappeared
+   git grep -nE "<deployment host>|<build host>|<deployment host>|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
    git commit -S -m "chore: purge leak re-import (sanitised)"
    git push github public:development                    # now fast-forward
    ```
@@ -209,7 +212,7 @@ HERMES_COPILOT_ACP_COMMAND="bash"
 HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
 ```
 
-- Local (`<HOST-1>`): command above. Remote (`<BUILD-HOST>`): same via
+- Local (<deployment host>): command above. Remote (<build host>): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -218,7 +221,7 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/exa
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
 - dsh sandbox (workspace-write) has no headless ask-hang; verified local
-  (`<HOST-1>`) and remote (`<BUILD-HOST>`). Deployment manual:
+  (<deployment host>) and remote (<build host>). Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official

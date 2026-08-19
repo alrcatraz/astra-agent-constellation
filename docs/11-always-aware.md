@@ -1,87 +1,87 @@
-# 11. Always-Aware — Orchestrator & Guardian Architecture Awareness
+# 11. Always-Aware — 编排者与看护者的架构感知保证
 
-> **Purpose**: guarantee that the orchestrator and the guardian are aware of
-> the multi-agent architecture **at every decision point** — not just when
-> task keywords happen to match a skill description. This chapter defines the
-> guarantee mechanism: layered approach (public) and deployment notes (private
-> copy only).
+> **目的**：确保编排者（Hermes）与看护者（tyche）在**每次决策时**都知晓
+> 多智能体架构的存在与可派发能力，而非依赖任务关键词碰运气。
+> 本章定义「总是知晓」的保证机制：思路（分层）与当前部署（私有）。
 
-## 11.1 Problem & Goal
+## 11.1 问题与目标
 
-**Background**: the constellation skill does not auto-load; in long tasks the
-orchestrator may work solo instead of dispatching. Triggering relies on a
-memory hint plus skill-description keyword matching, which leaves a coverage
-gap. **Goal** = the orchestrator always knows the dispatchable set and routes
-via ACP/A2A at the right moment (routing table: 01 §2.1).
+**背景**：星座 skill 不自动加载（"This skill does not auto-load"），编排者
+在长任务中可能独扛而不派发；触发依赖 MEMORY 提示 + skill 描述关键词匹配，
+存在遗漏窗口。目标 = 编排者每次决策**知晓可派发清单**，在恰当时机经
+ACP/A2A 路由，路由依据见 01 §2.1。
 
-**Constraint**: the mechanism must be low-maintenance — adding "always inject
-X" must not require changing plugin code (Unix-style extension: drop a file,
-it works).
+**约束**：实现必须低维护——新增「总是注入 X」的需求不应要求改造插件
+代码（Linux 式扩展：加文件即生效）。
 
-## 11.2 Guarantee Mechanism (layered approach, implementation-agnostic)
+## 11.2 保证机制（分层思路，与实现解耦）
 
-### Layer 1 — Resident injection (visible on every LLM call)
+### 层 1：常驻注入（每轮 LLM 调用可见）
 
-**Idea**: append a block of **static architecture facts** (existence +
-dispatchable set + routing pointer) to the system prompt of every LLM call.
-This is the physical guarantee of "always": as long as the model runs, the
-facts are in context.
+**思路**：在每次 LLM 调用的系统提示中追加一段**静态架构事实**（存在性 +
+可派发清单 + 路由指针）。这层是「总是」的物理保证——只要模型在跑，
+事实就在上下文里。
 
-**Implementation principle (Linux drop-in pattern)**: injection content is
-provided by an **operator-owned directory**, merged in filename-sorted order
-on every call; a single failing file is skipped (safe degradation).
-`10-*.md` / `20-*.md` prefixes control ordering. Add = new file; disable =
-rename; delete = remove file. **Content ownership stays with the operator,
-not the implementation** — replacing the implementation never loses content.
+**实现原则（Linux drop-in 模式）**：注入内容由**外部目录**提供，每轮
+调用时按文件名排序合并，单文件失败跳过（safe degradation）。目录内
+`10-*.md`、`20-*.md` 前缀控制顺序。新增注入 = 新增文件；禁用 = 改名；
+删除 = 删文件。**内容归属在算子侧，不在实现侧**——即使换注入实现，
+内容不丢。
 
-**Current injected content**: the dispatchable set (executor via ACP, guardian
-deferred) + routing pointer (01 §2.1) + "if parallelisable or needs a second
-machine, dispatch via ACP instead of working solo".
+**当前注入内容（私有部署）**：见 11.3 与 `~/.hermes/inject.d/`。
 
-### Layer 2 — Triggered loading (skill-description hook)
+### 层 2：触发加载（skill 描述钩子）
 
-**Idea**: the constellation skill's description (resident in the system
-prompt's skill index) carries trigger keywords — dispatch / parallel /
-multi-machine / cross-machine. On a hit, `skill_view` loads the full skill as
-procedural memory. Layer 1 guarantees "knows it exists"; layer 2 guarantees
-"knows the details when needed".
+**思路**：星座 skill 的 description 是系统提示常驻索引的一部分，包含
+触发关键词（dispatch / parallel / multi-machine / 派发 / 多机）。命中即
+`skill_view` 加载全文作为程序记忆。层 1 保证「知道存在」，层 2 保证
+「需要时知道细节」。
 
-### Layer 3 — Dynamic discovery (future evolution)
+### 层 3：动态发现（未来演进）
 
-**Idea**: A2A discover queries peer agents at runtime, replacing the static
-snapshot (ADR 0006). Current topology (2 executors + deferred guardian) is
-100% covered by the static snapshot, **so no dynamic layer is needed yet**.
-Adoption trigger: member count/topology changes frequently, or new
-discoverable services appear. Interface reserved, not implemented.
+**思路**：A2A discover 在运行时向对等 agent 查询存在性，替代静态快照
+（ADRs/0006）。当前 2 执行者 + guardian 无设备，静态快照 100% 覆盖，
+**暂不需要动态层**；接入条件：星座成员数量/拓扑变化频繁，或新增
+可发现服务。接口预留，不实现。
 
-## 11.3 Deployment Notes (private copy only)
+## 11.3 当前部署（私有副本 — 公开版不展示）
 
-> ⚠️ The concrete implementation — plugin, paths, environment variables, and
-> the exact injected snapshot — is recorded **only in the private copy** of
-> this blueprint (sanitisation gate: AGENTS.md). The public copy intentionally
-> carries the mechanism rationale (11.2) without deployment specifics. When
-> reproducing the mechanism, follow the private copy's deployment notes and
-> its operator-owned drop-in content directory.
+> ⚠️ 本节含私有实现细节（插件名、路径、环境变量），**公开副本必须删除**
+> 本节，仅保留 11.2 思路。净化规则见 AGENTS.md sanitisation gate。
 
-## 11.4 Guardian Awareness
+**实现载体**：Astra 生态的 context-anchor 插件（Hermes Agent 插件，
+pre_llm_call 钩子，v2.2）。
 
-The guardian has **no carrier device yet** — deployment deferred
-(PLAN.md). Design intent:
+- **注入目录**：`~/.hermes/inject.d/`（每轮 LLM 调用扫描 `*.md`，
+  文件名排序合并，追加到 `[CONTEXT ANCHOR]` 块之后）
+- **目录覆盖**：环境变量 `CONTEXT_ANCHOR_INJECT_DIR`（默认
+  `~/.hermes/inject.d/`）
+- **首个 drop-in**：`10-constellation.md` — 星座可派发快照：
+  - 编排者（angelia）可派发：dsh（DeepSeek Harness，ACP，推荐）、
+    OpenCode（ACP，存量）
+  - guardian（tyche）无承载设备，不可派发
+  - 路由：编排→执行走 ACP（ADR 0006 §2.1）；编排↔看护走共享事实层；
+    多编排者走 A2A
+  - 触发语：「可并行/需第二机 → 经 ACP 派发，勿独扛」
+- **部署路径**：插件代码在 astra-aiagent-infra 生态元仓
+  `work-principles/plugin/context-anchor/`（版本 2.2.0），生产副本经
+  符号链接挂载到 `~/.hermes/plugins/context-anchor/`
+- **生效语义**：hook 每轮重读目录，**无需重启**；新文件下轮 LLM 调用
+  即注入
 
-- the guardian senses architecture state via the shared fact layer
-  (registry + status files; 06 twin-star pattern);
-- its "always aware" is guaranteed by the cron trigger chain + status-file
-  polling, not by LLM resident injection;
-- once a device is available, activate per 08 guardian-runbook (real registry
-  → cron chain → guardian skill).
+## 11.4 看护者的「总是知晓」
 
-## 11.5 Verification & Regression
+看护者（tyche）**无承载设备，暂缓部署**（PLAN.md）。设计意图：
+- 看护者经共享事实层（注册表 + 状态文件）感知架构状态（06 章双星模式）
+- 其「总是知晓」由 cron 触发链 + 状态文件轮询保证，非 LLM 常驻注入
+- 设备就位后按 08 章 runbook 激活（真实注册表 → cron 链 → 看护者 skill）
 
-- **Unit / end-to-end**: injection merge logic (ordering, empty dir, bad-file
-  skip, empty-file skip, full chain) is covered by the plugin's test suite
-  (unit tests + e2e smoke).
-- **Manual check**: a new session's system prompt containing the injected
-  section = injection active; editing a drop-in file changes the next call's
-  injection = live update.
-- **Regression risk**: unreadable/empty injection directory → silently skipped
-  (no injection; the base anchor block is unaffected).
+## 11.5 验证与回归
+
+- **单元/端到端**：注入目录合并逻辑（排序、空目录、坏文件跳过、空文件
+  跳过、e2e 全链）随插件测试套件覆盖（astra-aiagent-infra
+  `plugin/context-anchor/tests/`）
+- **人工验证**：新会话系统提示可见 `[CONSTELLATION]` 段 = 注入生效；
+  改 drop-in 文件后下轮调用即变 = 动态生效
+- **回归风险**：注入目录不可读/空 → 静默跳过（无注入，不影响原
+  `[CONTEXT ANCHOR]` 块）
