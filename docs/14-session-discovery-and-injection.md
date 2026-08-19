@@ -37,13 +37,14 @@ Query `~/.hermes/state.db`:
 SELECT id, title, source FROM sessions WHERE title LIKE '%keyword%' AND ended_at IS NULL;
 ```
 
-Verified working (2026-08-19). The `sessions` table schema:
+Verified working (2026-08-19). The `sessions` table has 50+ columns; the
+key ones for discovery and injection are:
 
 | Column | Type | Notes |
 |:--|:--|:--|
 | `id` | TEXT PK | Format: `YYYYMMDD_HHMMSS_uuid_prefix` |
 | `title` | TEXT | Auto-generated from first user message (may be truncated) |
-| `source` | TEXT | Platform origin: `a2a`, `acp`, `cli`, `telegram`, etc. |
+| `source` | TEXT | Platform origin: `desktop`, `a2a`, `acp`, `cli`, `telegram`, etc. |
 | `chat_id` | TEXT | Bound to `context_id` only for A2A-created sessions |
 | `started_at` | REAL | Unix timestamp |
 | `ended_at` | REAL | NULL if active |
