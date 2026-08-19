@@ -147,3 +147,11 @@
   `agent.url` 即自环 `a2a_call` 的目标。
 - **确定性 context_id**：项目会话用固定的 `project-core`/`project-modA` 等
   作为 context_id，使 `a2a_history`/`a2a_call` 可预期、跨重启存活。
+
+## 13.7 与 Session Discovery（docs/14）的关系
+
+docs/13 覆盖的是 A2A context_id 已知的场景（编排者主动发起的协作）。
+如果会话是用户手动创建的（无 A2A context），需要通过 docs/14 的
+Session Discovery & Injection 机制发现并注入消息。二者互补——
+A2A 适合已知 target 的主动协作，Session Discovery 适合事后发现和召回。
+详见 `14-session-discovery-and-injection.md`。
