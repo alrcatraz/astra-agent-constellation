@@ -1,0 +1,26 @@
+# OpenCode global configuration — dotfiles layout
+#
+# Place this file at ~/.config/opencode/opencode.json on each machine.
+# Credentials are NEVER stored here — inject via environment variables
+# from the credential store at runtime.
+#
+# Written in British English.
+
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "default": {
+      "baseURL": "${OPENCODE_BASE_URL}",
+      "models": {
+        "coding": { "name": "${OPENCODE_MODEL}" }
+      }
+    }
+  },
+  "permissions": {
+    "deny": ["git push *", "rm -rf *", "env"],
+    "ask": ["git commit *", "git push origin main"],
+    "allow": ["read", "edit", "bash", "glob", "grep"]
+  },
+  "model": "coding",
+  "autoupdate": false
+}

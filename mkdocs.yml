@@ -1,0 +1,84 @@
+site_name: Astra Agent Constellation
+site_description: 多智能体编排架构蓝图——单一编排者、位置化执行者、看护者与工具门禁
+site_url: https://alrcatraz.github.io/astra-agent-constellation/
+repo_url: https://github.com/alrcatraz/astra-agent-constellation
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  font: false
+  icon:
+    logo: material/star-four-points-outline
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切换到暗色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到亮色模式
+
+extra_css:
+  - stylesheets/tokens.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - 首页: index.md
+  - 总览: 00-overview.md
+  - 规范:
+      - 拓扑与角色: 01-topology.md
+      - 同步分层: 02-sync-layers.md
+      - 基础设施共用: 03-tool-sharing.md
+      - 纪律传导: 04-harness.md
+      - 可观察性与审计: 05-observability.md
+      - 双星模式: 06-gemini-pattern.md
+      - 看护者操作手册: 08-guardian-runbook.md
+      - 演练剧本: 09-game-day.md
+      - ACP 内容映射: 10-acp-mapping.md
+      - 总是知晓: 11-always-aware.md
+      - 对外互操作: 12-external-interop.md
+      - 内部多会话协作: 13-multi-session-collaboration.md
+      - Session 发现与注入: 14-session-discovery-and-injection.md
+      - DSH 编排者配置: 15-dsh-orchestrator-config.md
+  - 采纳路径: 07-adoption.md
+  - 决策记录:
+      - references/0001-agent-platform-selection.md
+      - references/0002-why-positional-deployment.md
+      - references/0003-guardian-placement.md
+      - references/0004-sync-layer-split.md
+      - references/0005-observability-contract.md
+      - references/0006-inter-agent-protocol-selection.md
