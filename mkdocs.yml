@@ -72,6 +72,7 @@ nav:
       - 总是知晓: 11-always-aware.md
       - 对外互操作: 12-external-interop.md
       - 内部多会话协作: 13-multi-session-collaboration.md
+      - Session 发现与注入: 14-session-discovery-and-injection.md
   - 采纳路径: 07-adoption.md
   - 决策记录:
       - references/0001-agent-platform-selection.md
