@@ -1,10 +1,10 @@
 ---
-title: "15 — DSH Configuration Profiles"
+title: "13 — DSH 配置档"
 date: 2026-08-19
 status: draft
 ---
 
-# 15 — DSH Configuration Profiles
+# 13 — DSH 配置档
 
 ## Overview
 
@@ -23,8 +23,8 @@ presents both profiles side-by-side for reference.
 | **Bash** | `bash-sandbox` | `bash-local` |
 | **Subagents** | spawn + fork (in-process only) | + `subagent-acp` (remote executors) |
 | **Session mgmt** | Own session only | Multiple sessions, discovery, injection |
-| **Terminal/PTY** | Yes (for code execution) | No (delegates to executors) |
-| **LSP** | Yes (code intelligence) | No (not needed) |
+| **Terminal/PTY** | Yes (for code execution) | Yes (short ops — orchestrator runs commands directly too; delegates only long build-fix loops) |
+| **LSP** | Yes (code intelligence) | Optional (symbol navigation when orchestrator reviews executor diffs) |
 | **Code runtime** | Yes (safe model-written programs) | No (delegates to executors) |
 | **Web tools** | Yes (docs lookup) | Optional |
 | **Hooks** | Claude Code + Codex bridges | Not applicable |
@@ -85,12 +85,14 @@ These plugins are common to both executor and orchestrator editions:
 #     workspaceRoot: !!js process.cwd()
 
 # Approval policy
-# Executor: ask (sandboxed)
-# Orchestrator: never (relaxed)
+# Executor: ask (sandboxed writes need a grant)
+# Orchestrator: ask — see "Approval policy" section below.
+#   `never` is NOT a relaxed mode: it fail-closes (rejects every gated op),
+#   which would lock the orchestrator out of its own structural writes.
 - id: approval
   name: '@deepseek-ai/dsh-user-approval'
   config:
-    policy: ask   # or 'never' for orchestrator
+    policy: ask
 
 # Skills base
 - id: skill
@@ -348,11 +350,14 @@ These plugins are common to both executor and orchestrator editions:
 | `acp-agent` | Orchestrator doesn't expose ACP server |
 | `fs-sandbox` | Orchestrator needs full filesystem access |
 | `bash-sandbox` | Orchestrator needs full shell access |
-| `terminal` / `terminal-bash` / `tool-terminal` | Orchestrator doesn't need PTY |
 | `hooks-claude-code` / `hooks-codex` | Not applicable to orchestration |
-| `lsp` / `lsp-stdio` / `tool-lsp` | Not needed for orchestration |
 | `code-runtime` | Orchestrator delegates execution |
-| `web` / `web-search` / `tool-web` | Optional for orchestrator |
+| `web` / `web-search` / `tool-web` | Optional for orchestrator (docs/dependency lookup) |
+
+> Note: `terminal` / `terminal-bash` / `tool-terminal` and `lsp` / `lsp-stdio` /
+> `tool-lsp` are **shared capabilities**, not executor-only — the orchestrator
+> runs short ops directly (see profile table above). Remove the executor-only
+> designation for these when diffs are copied between profiles.
 
 ### What the Orchestrator Has That the Executor Doesn't
 
@@ -396,3 +401,118 @@ These plugins are common to both executor and orchestrator editions:
 For most orchestration scenarios, use `spawn` for local subtasks and `acp`
 for remote executors. Reserve `fork` for one-shot tasks that benefit from
 memory inheritance.
+
+## Orchestrator Operational Additions
+
+The Orchestrator Edition spine above covers session discovery, delegation and
+filesystem reach. Three capabilities are deliberate additions for orchestration
+work (decompose→plan→delegate, hold durable objectives, timed dispatch):
+
+### Plan mode (decompose before you delegate)
+
+The orchestrator decomposes a task into a plan and presents it via
+`exit_plan_mode` for review *before* dispatching any sub-delegation. Add:
+
+```yaml
+- id: plan-mode
+  name: '@deepseek-ai/dsh-plan-mode'
+  config:
+    section: |
+      You are in plan mode. Explore the task and design the sub-delegation
+      plan, then present it via exit_plan_mode for review before acting.
+```
+
+### Durable same-session objectives (goal state)
+
+Hold the run's objectives in goal state so a long orchestration keeps its
+decomposed targets across subagent returns:
+
+```yaml
+- id: goal
+  name: '@deepseek-ai/dsh-goal'
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+- id: command-goal
+  name: '@deepseek-ai/dsh-command-goal'
+```
+
+### Scheduled / recurring dispatch
+
+Optional `schedule` if the orchestrator drives timed or recurring dispatch
+(health re-checks, dependency bumps):
+
+```yaml
+- id: schedule
+  name: '@deepseek-ai/dsh-schedule'
+```
+
+### Approval policy (why `ask`)
+
+`@deepseek-ai/dsh-user-approval` has a binary `policy`: `ask` or `never`.
+There is no smart/split tier; the decision lives in the **answerer** that
+listens for `approval/request`.
+
+- `never` fail-closes: every operation requiring approval is rejected
+  outright. On the orchestrator this locks out its own structural writes —
+  it is **not** an "unrestricted" mode. Do not use `never` on the orchestrator.
+- `ask` routes gated ops to an answerer. Headless without a composed answerer
+  resolves `unavailable` (also fail-closed). Compose a decision answerer —
+  e.g. a community reviewer plugin (`Letter2025/dsh-approval-llm`,
+  `PerryLink/dsh-auto-review`) that backs `approval/request` with a reviewer
+  LLM returning ALLOW/DENY/ESCALATE — for the same "model reviews first, human
+  fallback" shape as Hermes smart approval.
+
+Use `ask` with a decision answerer. For orchestrator write discipline, every
+structural write then goes through review rather than an unlogged pass.
+
+### Orchestrator key scope
+
+`AIGATE_ORCHESTRATOR_KEY` — scope `orchestrate:completions`, machine-local in
+`~/Projects/dsh/.env` (gitignored). A separate scope from
+`AIGATE_EXECUTOR_KEY` (`execute:completions`) keeps orchestrate separate from
+execute in the gate.
+
+### Boot / launch (canonical)
+
+The executor edition boots directly from a `cordis.yml` via tsx
+(`node --import tsx …/bin.ts --config executor/cordis.yml`). The orchestrator
+edition boots through the **official `--profile` launcher** instead — the same
+path as the shipped `headless` and `web` profiles — giving it layered
+configuration (bundle layers below, your `cordis.patch.yml` overlay above),
+hot-reload of the user layer, and `dsh plugin` for out-of-tree plugins.
+
+```bash
+dsh --profile orchestrator --dump-config      # dry-run: inspect resolved tree
+dsh --profile orchestrator "<task>"            # live one-shot run
+```
+
+The profile lives at `~/.dsh/profiles/orchestrator/`:
+
+- `package.json` → `dsh.profile.bundles: ["@deepseek-ai/dsh-base",
+  "@deepseek-ai/dsh-headless"]` plus any out-of-tree plugin dependencies
+  (e.g. `@deepseek-ai/dsh-llm-pi-ai`).
+- `cordis.patch.yml` → the orchestrator overlay applied last (AIGate routing
+  via `agent-default-model` + `llm-pi-ai`, the orchestrator persona, and any
+  plugin not already in a bundle).
+- `~/.dsh/.env` → the machine-local `AIGATE_ORCHESTRATOR_KEY`
+  (`loadLayeredEnv` reads inherited → invoking-dir → Harness-home).
+
+`dsh-base` already mounts the approval seam (`approval` →
+`@deepseek-ai/dsh-user-approval`; policy resolves from the permission presets,
+`workspace-write` ⇒ `ask`), `goal`/`tool-goal`, and the `llm-pi-ai` adapter —
+so the overlay must **override** these, **not re-insert** them (re-inserting
+`approval`/`goal` fails with `duplicate loader entry id`). `dsh-headless`
+mounts the one-shot runner (`dsh --profile orchestrator "<task>"`). During
+bring-up you may reuse the executor key (scope `execute:completions`) for model
+calls, moving to the dedicated `orchestrate:completions` key before production.
+
+#### Interactivity note
+
+The `headless` bundle runs a **one-shot** agent: it takes one task, produces a
+durable result, and exits. In this mode the orchestrator **plans and narrates
+the split but does not spawn live ACP subprocesses that outlive the turn** —
+genuine long-lived dispatch across remote executors is the executor
+(`acp-agent`) / future orchestrator TUI surface. `headless` is the right fit
+for validating configuration and model routing; choose the interactive surface
+for sustained orchestration. This bounds the scope of what a `headless`
+deploy verifies.

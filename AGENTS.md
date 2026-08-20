@@ -138,7 +138,7 @@ that track.)
    #   skills/.../references/a2a-interop.md  (real port plan)
    #   templates/cordis-executor.yml.example
    # Public-safe additions to KEEP (written sanitised):
-   #   docs/12-external-interop.md, templates/external-interop/*
+   #   docs/12-cross-agent-collab.md, templates/external-interop/*
    # Scan the staged tree for real host/IP/domain/machine-name hits
    # (incl. any machine abbreviation such as HC01) before committing.
    git commit -S -m "... (sanitised)"

@@ -273,13 +273,13 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
   *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
-  endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
+  endpoints, or did:wba identity resolution, consult `docs/12-cross-agent-collab.md`
   (general blueprint incl. did:wba 12.9, the **peer interop handbook 12.10**
   with copy-paste A2A card+message and ANP DID+signature clients and a failure
   triage table) + the operator's private copy of the external-endpoint docs.
   ANP trust is **did:wba only** (no phase1 pre-shared trust remains): identity
   `did:wba:<hostname>`, native network resolution, k1 identity + ES256 JWT
-  signatures — see `docs/12-external-interop.md` §12.9 (identity layer) and
+  signatures — see `docs/12-cross-agent-collab.md` §12.9 (identity layer) and
   §12.11 (enable did:wba operation checklist). For the dispatch bridge —
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
@@ -290,8 +290,8 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   within *one* profile (the orchestrator's own team) coordinate via A2A.
   When a task spans multiple sessions/modules of the same agent and they must
   notify each other, request one another to actually modify code, or preserve
-  working memory across re-entry, consult `docs/13-multi-session-collaboration.md`
-  (docs/13, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
+  working memory across re-entry, consult `docs/12-cross-agent-collab.md`
+  (Part B, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
   default, request-collaboration, session-vs-global memory model, and the
   security default that `a2a_call` is NOT open by default. This is separate
-  from external interop (docs/12) and from the internal A2A ladder above.
+  from external interop (Part A) and from the internal A2A ladder above.
