@@ -1,4 +1,19 @@
-# 12. 对外互操作 — 团体边界与外部智能体协作
+# 12. 跨 Agent 协作与互操作 — 对外互操作、队内协作与会话发现
+
+> **目的**：统一描述星座内 agent 间协作的**三个层面**——对外互操作
+> （与外部智能体/团体对等协作）、队内多会话协作（同一编排者内多个
+> 会话分工/知会/记忆）、以及会话发现与注入（找回并续接既有会话）。
+> 三者边界先行：对外走 A2A/ANP 对等协议（Part A），队内走 A2A 知会
+> 与共享事实层（Part B），会话发现是二者都依赖的底层机制（Part C）。
+> 相关选型证据见 [ADR 0006 对外互操作门面](references/0006-inter-agent-protocol-selection.md)。
+
+> 三层的判定口诀：对象是**团体外的独立实体** → Part A；是**同一份
+> profile 内的多个会话上下文** → Part B；是要**找回/续接一个既有会话**
+> → Part C。混淆三者的边界是多数多智能体方案设计偏差的根源。
+
+---
+
+## Part A — 对外互操作（团体边界与外部智能体协作）
 
 > **目的**：定义团体与**外部**智能体/智能体团体对等互操作的边界、协议
 > 分层与操作步骤。内部接缝（编排者→执行者、看护者）仍遵守「禁直连、走
@@ -303,7 +318,7 @@ print(r.stdout[:400])
 | 签名 URL 不匹配 | 客户端签的 `@target-uri` 与服务端重建的形态不一致 | 双方统一用对外 `https://<HOST>/rpc`；nginx 透传 Host + X-Forwarded-Proto（勿在 location 内覆盖 proxy_set_header，12.9.3/12.11.4） |
 | 404（ad.json/did.json） | 公开身份文档未挂载/被鉴权拦截 | 应用层加「公开路径中间件」放行身份文档，仅 RPC 面鉴权（12.9.3） |
 
-> 本手册与 docs/12 其余部分同属**通用蓝图**：不含任何特定 agent 的
+> 本手册与 Part A 其余部分同属**通用蓝图**：不含任何特定 agent 的
 > 真实域名、DID 或密钥。具体某个成员的登记值属私有边界，见部署方。
 
 ## 12.11 启用真 did:wba（操作清单，2026-08-16 验证）
@@ -412,3 +427,382 @@ Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/ext
   经**公网**门面签调用 `/rpc` `/task`，期望 200 + `result.message` = 本机
   hostname 类真实执行输出 + `origin_did` = 调用方 DID（12.11.3 的闭环，但
   任务改为真执行而非 echo）。
+---
+## Part B — 队内多会话协作（同一团队的会话分工、知会与记忆）
+**注意：本章此处与「对外互操作」共用「agent 间协作」主题；Part B 只覆盖队内（同一 profile 内）会话。**
+
+> **目的**：定义「一个团队（同一份 profile / 编排者）内的多个 Hermes
+> 会话」如何通过 A2A 相互知会、请求协作、共享后续记忆，并划清它与
+> 「多个独立智能体（多 profile）」的能力边界。本章是 01 §2.1 路由与
+> 12 对外互操作之间的**队内协作**空白。
+>
+> 能力边界先行的总原则：MUST 在本章选型的边界内使用下述机制，把方案
+> 用在自己该用的地方，不越界冒充「真正独立的多智能体」。
+>
+> 本章正文面向读者使用简体中文；RFC 2119 关键词（MUST/SHOULD/MAY）
+> 保留英文。
+
+## 13.1 概念：分身（Avatar）vs 真多智能体
+
+这是整章最重要的边界，先钉死。
+
+- **分身（Avatar）**：**同一份 profile 的多个会话上下文**。它们共享
+  同一个全局 memory、同一套 toolset、同一个 LLM 配置，只是各自带着
+  **不同的对话历史和工作区心智**在跑。靠 A2A 消息互相知会。**这是
+  本章机制适用的范围。**
+- **真多智能体（Independent multi-agent）**：**多个独立 profile**，各自
+  有**隔离的 memory / 凭据 / skills / 对话历史**。它们才是「不同视角、
+  不同知识、能真正分工辩论」的实体。
+
+**判定口诀**：要的是「一个大脑的多个分身，协作时全局一致」→ 用本章的
+内部多会话 A2A；要的是「多个独立大脑，互不读对方记忆」→ 用多 profile，
+不读本章后面的一切。混淆二者是多数多智能体方案设计偏差的根源。
+
+**为什么这对本项目成立**：编排者是单一大脑，执行者是位置化实体；队内
+模块会话（取自同一 profile）天然是分身边界，适合内部多会话协作；而
+对外/跨立场实体（外部智能体、独立部署的 agent）才需要独立身份，那是
+12 章对外互操作的范畴。
+
+## 13.2 内部多会话的三种用法（能力从弱到强）
+
+### 13.2.1 A+B：共享知识库为真相源 + A2A 知会（推荐，MUST 默认）
+
+适用于**大项目拆多个模块会话推进**，需要模块间互相知会、对照状态。
+
+- **共享事实层**：一个迭代方案里，各会话以**共享标记/台账文件**（如
+  项目内 `STATUS`、约定路径）作为**单一真相源**。模块 A 完成写回台账，
+  模块 B 读台账即精确知会 A 的状态。
+- **A2A 用于知会/拉取**：发起方向另一会话上下文发消息，通知其更新或
+  拉取最新状态；被通知会话读共享台账即可对齐。
+
+**关键收益（实测）**：模块 B **精确知会**模块 A 的真实状态，且能**诚实
+发现缺口**（「只有契约没有数据」）并回报与推进；`a2a_history` 可跨会话
+读对话记录。共享文件是真相源，A2A 解决「如何把信号送进另一会话」，
+二者分层清晰。
+
+### 13.2.2 请求协作（Beyond Notify）：A2A 请求另一会话实际干活
+
+适用于需要另一会话直接改代码/跑命令，而非仅知会。
+
+- 实例上已经跑通：编排者 `a2a_call(目标会话, 任务, context_id)` →
+  目标会话用其自身的文件/终端/执行工具**真实修改代码并运行回报**，
+  落盘可验证、输出随机数证明真实执行。
+
+**边界（MUST 遵守）**：
+- 被请求会话操作的是**其所在主机**的文件系统——跨机器需路径可达 /
+  挂载，否则 MUST 先解决可达性。
+- 被请求会话仍受其自身的**修改门禁/审批**约束，不应因来自 A2A 而跳过。
+
+### 13.2.3 纯 B：无共享文件的纯 A2A 路由
+
+适用于不便建共享文件、只靠消息传递的场景。
+
+**已知约束（实测关键发现）**：**被调用的会话未必有 `a2a_call` 工具**——
+它受 toolset 白名单约束。若被调用会话的 toolset 不含 `a2a`，它**只能
+收、不能发**。此时纯 B 的可行形态为：
+1. **编排者搬运**（已实测）：编排者代为 `a2a_call` 转录状态给另一会话，
+   由其在自己 context 记忆记录——无需给接收方开 a2a。
+2. **给接收方会话加 a2a toolset**（配置改动，MUST 先经用户同意，见 13.4
+   安全）。
+
+因此「纯 B」通常退化为「编排者居中搬运」，而非对等互发。
+
+## 13.3 记忆模型：会话级 vs 全局（关键差异）
+
+决定「再进入某会话是否有记忆」的是**记忆存哪一层**：
+
+- **全局 memory**（profile 层）：所有会话共享读写，跨会话存在。A2A
+  消息**不会自动写入**全局 memory（实测：会话关键词在全局 memory 无
+  匹配）——同步 MUST 依靠显式写文件 / 调 memory / 编排者搬运。
+- **会话级记忆**（A2A context 层）：每个 context 一个持久化对话档案
+  （`a2a_conversations/<context>.jsonl`），**compaction 与重启不丢**。
+  **同 context_id 再进入 = 回到同一个 live 会话上下文，保有该会话的
+  完整工作记忆**（实测验证：再进入后准确记得上次协作的暗语与任务清单，
+  纯上下文延续、无需写库）。
+
+**推论（再进入时记忆的实际广度）**：
+- 续接**同一 context** → 一定有该会话的协作记忆（会话级）。
+- 新开一个**不相关的 Hermes 会话** → 不会自动注入某 context 的历史；
+  要靠当时**显式写共享文件 / 全局 memory**，或主动 `a2a_history` 召回。
+
+**最佳实践（MUST）**：模块会话协作完成时，执行方 MUST 把「我做了什么 +
+改了哪些 / 全局变更」**写回共享台账或全局 memory**——这样无论从哪个
+会话、哪个 context 再进入，协作记忆都完整存在（这正是「智能体保有工作
+记忆」的落地）。
+
+## 13.4 安全：a2a_call 的开放与否（关键决策）
+
+**默认决策（MUST）**：`a2a_call` **默认不对所有会话开放**。安全依据：
+
+- 任一被注入的会话（可能被提示注入利用）若获得**发信能力**，就构成
+  横向移动面；入口有防护（注入过滤/脱敏/审计/对端认证），**出口没
+  有对应防护**——入出不对称。
+- 编排者居中 = **单一出口闸门**：可控、可审计、被调用会话一律经
+  编排者路由。
+
+**若确需开放（用户决策，非本手册默认）**：MUST 配置对等体白名单
+（`A2A_PEER_TOKENS` + `A2A_TRUSTED_PEERS`），**绝不裸开**。跨主机分发
+时，专用受限会话限定受信对等体。
+
+安全护栏放在此处而不放在路由决策处，因为它决定**整个队内协作面的
+信任边界**，属于所有内部多会话用法的前置约束。
+
+## 13.5 何时用 / 何时不用（决策表）
+
+| 场景 | 用内部多会话 A2A? | 依据 |
+|:--|:--|:--|
+| 大项目拆多个模块会话，需互相知会/对照进度 | ✅ A+B | 13.2.1，单一真相源 + A2A 知会 |
+| 编排者请求另一会话直接改代码 | ✅ 请求协作 | 13.2.2，需目标会话在可达主机 |
+| 只要信号通知，不要对方干活 | ✅ A+B 或编排者搬运 | 13.2.1 / 13.2.3 |
+| 要求不同角色有独立视角/知识，真正分工辩论 | ❌ 用多 profile | 13.1 真多智能体 |
+| 对方记忆 MUST 与其他会话隔离 | ❌ 用多 profile | 13.1，profile 级隔离 |
+| 涉及外部/跨团队实体 | ❌ 走 Part A 对外互操作 | ANP 身份层，见本章 Part A |
+
+## 13.6 已知实现要点（2026-08 实测）
+
+- A2A URL 可直接传目标 agent 的 HTTP(S) 地址作为对等体，无需预配
+  对等清单；入站 `chat_id = context_id`，同 context_id 路由到同一会话。
+- 自环（self-loopback）实测可能有副作用：目标会话里 user 消息重复
+  两次——知会类消息宜直接语义化去重。
+- 被调用会话沿用自有 toolset；若需其具备 `a2a` 工具，MUST 先经用户
+  同意（13.4）才改配置。
+- A2A 会话持久化档案用于审计与召回：`a2a_history` 可跨会话读对话；
+  测试用 context 完成后 MUST 清理，但审计留痕（append-only）应保留。
+- **Anti-loop 护栏**：单 context 的 ping-pong 轮次上限由
+  `A2A_MAX_PINGPONG_TURNS`（默认 5）限制，避免 agent↔agent 死循环；
+  合理的长协作可提高该值或换新 context_id。
+- **端口规划**（勿混淆）：Hermes 内部 A2A = **9900**；9901/9119 是其他
+  角色（父端 serve / dashboard）；对外 A2A/ANP = **9910/9911**（主宿）。
+- **自检命令**：规划 A2A 调用前
+  `curl 127.0.0.1:9900/.well-known/agent-card.json` 返回 agent card，
+  `agent.url` 即自环 `a2a_call` 的目标。
+- **确定性 context_id**：项目会话用固定的 `project-core`/`project-modA` 等
+  作为 context_id，使 `a2a_history`/`a2a_call` 可预期、跨重启存活。
+
+## 13.7 与会话发现与注入的关系（Part C）
+
+Part B 覆盖的是 A2A context_id 已知的场景（编排者主动发起的协作）。
+如果会话是用户手动创建的（无 A2A context），需要通过 Part C 的
+Session Discovery & Injection 机制发现并注入消息。二者互补——
+A2A 适合已知 target 的主动协作，Session Discovery 适合事后发现和召回。
+详见本章 Part C（会话发现与注入）。
+---
+## Part C — 会话发现与注入
+
+## 问题定义（Problem Definition）
+
+A2A `a2a_call` creates a new context with `chat_id = context_id`. Sessions
+created manually (browser tabs) or by executors (DSH, OpenCode) lack this
+binding. When an orchestrator needs to resume work in an existing session —
+its own or a peer's — the A2A protocol provides no direct mechanism.
+
+**Key finding: there is no universal injection protocol.** Each orchestrator
+uses its own native interface for session injection.
+
+## Core Design Decision
+
+Rather than pursuing a one-size-fits-all injection API, this design adopts a
+**delegated injection model**:
+
+1. **Source orchestrator** discovers the target session ID (via local lookup)
+2. **Source orchestrator** sends an A2A message containing `{target_session, content}` to the **destination orchestrator**
+3. **Destination orchestrator** uses its own native injection method to deliver the message to the specified session
+
+This keeps responsibilities clear: each agent handles its own sessions.
+
+## Session Discovery
+
+### Hermes Orchestrator
+
+Query `~/.hermes/state.db`:
+
+```sql
+SELECT id, title, source FROM sessions WHERE title LIKE '%keyword%' AND ended_at IS NULL;
+```
+
+Verified working (2026-08-19). The `sessions` table has 50+ columns; the
+key ones for discovery and injection are:
+
+| Column | Type | Notes |
+|:--|:--|:--|
+| `id` | TEXT PK | Format: `YYYYMMDD_HHMMSS_uuid_prefix` |
+| `title` | TEXT | Auto-generated from first user message (may be truncated) |
+| `source` | TEXT | Platform origin: `desktop`, `a2a`, `acp`, `cli`, `telegram`, etc. |
+| `chat_id` | TEXT | Bound to `context_id` only for A2A-created sessions |
+| `started_at` | REAL | Unix timestamp |
+| `ended_at` | REAL | NULL if active |
+| `message_count` | INTEGER | Total messages in session |
+| `model` | TEXT | Model used |
+| `last_activity_at` | REAL | Last activity timestamp |
+
+**Limitation**: ACP-originated sessions (DSH/OpenCode) have `title IS NULL`,
+making keyword-based discovery unreliable. Mitigation: require users to provide
+session IDs or use descriptive titles when creating sessions.
+
+### DSH Orchestrator
+
+DSH stores sessions as JSONL files compressed with zstd:
+
+```
+~/.dsh/.sessions/<cwd_hash>/<session_uuid>/session.jsonl.zstd
+```
+
+The first line of each file contains session metadata:
+
+```json
+{
+  "type": "session",
+  "version": 0,
+  "id": "<uuid>",
+  "createdAt": <timestamp>,
+  "cwd": "/path/to/workspace",
+  "delegationDepth": 0
+}
+```
+
+Title is auto-generated from the first user message (truncated at ~25 chars).
+Discovery requires iterating all session directories and decompressing the first
+line — slower than SQL but functional.
+
+## Injection Methods
+
+Each orchestrator uses its native interface:
+
+### Hermes: `hermes chat --resume`
+
+```bash
+hermes chat --resume <session_id> -q "<message>"
+```
+
+**Verified working (2026-08-19)**:
+
+- Binds the CLI process to the target `session_id`
+- Loads full conversation history
+- Sends the injected message
+- Results are atomically written back to the original SQLite instance
+- All subsequent turns append to the same session context
+
+**Known limitation**: If the target session's toolset configuration references
+non-existent toolsets (`Warning: Unknown toolsets: ...`), the agent may hang or
+timeout. This is a session-specific configuration issue, not a `--resume` bug.
+
+### DSH: ACP `session/prompt`
+
+```typescript
+// Via ACP client
+await acpClient.prompt({
+  sessionId: "<session_uuid>",
+  prompt: [{ type: "text", text: "<message>" }]
+});
+```
+
+DSH's ACP server accepts a `sessionId` parameter in `session/prompt`, allowing
+messages to be injected into existing sessions. **Requires an active ACP channel
+to the DSH orchestrator.**
+
+**Limitation**: DSH runs as a stdio server. When driven by another orchestrator
+(e.g., Hermes via CopilotACPClient), the stdin/stdout pipe is occupied. An
+independent ACP connection must be established for external injection.
+
+### Other Orchestrators
+
+Each additional orchestrator type implements its own injection method. Document
+them in their respective skills.
+
+## Cross-Agent Collaboration Flow
+
+```
+Orchestrator A (Hermes)                    Orchestrator B (DSH)
+     |                                           |
+     |  User: "collaborate with B's 'task-x'    |
+     |         session"                          |
+     |                                           |
+     |  1. Discover target session_id locally   |
+     |  2. Construct A2A Message:               |
+     |     {                                    |
+     |       type: "a2a_injection",            |
+     |       source: "orchestrator-a",         |
+     |       target_session: "<session_id>",   |
+     |       content: "Please collaborate on:  |
+     |                  ..."                    |
+     |     }                                    |
+     |  3. Send via A2A to B                   |
+     |─────────────────────────────────────────>│
+     |                                           |
+     |                                           |  4. B receives A2A Message
+     |                                           |  5. B looks up session_id in local registry
+     |                                           |  6. B uses native inject() to deliver
+     |                                           |
+```
+
+The A2A message payload uses a structured format so the receiving orchestrator
+can identify it as a cross-session collaboration request rather than a regular
+user message.
+
+## A2A Message Format
+
+```json
+{
+  "type": "a2a_injection",
+  "source": "<orchestrator_identifier>",
+  "target_session": "<session_id>",
+  "content": "<actual task description>"
+}
+```
+
+- `type`: Identifies this as a cross-session injection (not a regular message)
+- `source`: Identifier of the sending orchestrator (for audit trail)
+- `target_session`: The session ID the receiving orchestrator should resume
+- `content`: The actual task description to execute
+
+Receiving orchestrators SHOULD parse this format and treat the `content` field
+as the actionable instruction, while using `source` and `target_session` for
+logging and verification.
+
+## Limitations and Deferrals
+
+### No Universal Protocol
+
+There is no single API that works across all orchestrator types. Each must
+implement its own injection method. This is intentional: forcing a common
+interface would require modifying upstream projects (Hermes, DSH) and create
+maintenance burden.
+
+### ACP Session Metadata Gap
+
+ACP-originated sessions (DSH, OpenCode) typically have empty `title` fields
+in the orchestrator's session store. This makes natural-language keyword search
+unreliable. Mitigations:
+
+1. **Require session IDs**: When precise targeting is needed, users/orchestrators
+   should provide the exact session ID rather than relying on keyword search.
+2. **Descriptive titles**: Orchestrators that create sessions programmatically
+   SHOULD set meaningful titles to improve discoverability.
+3. **Parent-child relationships**: Use `parent_session_id` (where available) to
+   trace session lineage instead of keyword matching.
+
+### DSH Stdio Channel Constraint
+
+DSH's stdio transport means only one ACP client can drive it at a time. External
+injection requires either:
+
+- An independent ACP connection (separate process)
+- Coordination with the driving orchestrator to temporarily release the channel
+- Using DSH's internal APIs (not through ACP)
+
+This constraint applies specifically to the executor edition of DSH. The
+orchestrator edition (if deployed) may support concurrent connections.
+
+### OpenCode Injection Not Verified
+
+OpenCode's `-s/--session` flag was tested and failed with a server error. This
+may be a version-specific bug or limited to fork mode. OpenCode injection is
+deferred until verified working.
+
+## Relationship to Other Docs
+
+- **Part B** (§13.6): Covers A2A context routing and health checks. This part
+  addresses the complementary problem of injecting messages into non-A2A
+  sessions.
+- **ADR 0006** (inter-agent protocol): Defines the overlay network and auth
+  boundary. Cross-agent session injection operates within this boundary.
