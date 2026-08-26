@@ -18,7 +18,25 @@
 
 ## 决策
 
-**编排者采用 Hermes Agent（开源智能体框架）——现状，MUST**。
+**编排者采用 Hermes Agent（开源智能体框架）——现状，MUST**；**DSH 编排者版亦为满足编排职责的可用实现**（同一角色可适配不同 Agent，可担任≠必须担任，见[拓扑与角色](../01-topology.md)）。当前实际编排者=Hermes。
+
+**DSH 编排者版配置表（插件声明，`~/.dsh/profiles/orchestrator/cordis.patch.yml`）**——完整版与编排者/执行者对比见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
+
+```yaml
+# ~/.dsh/profiles/orchestrator/cordis.patch.yml（用户层，叠加在 bundle 之上）
+profile:
+  bundles:
+    - '@deepseek-ai/dsh-base'      # 基础层（approval/goal/agent-loop 等已在其中）
+    - '@deepseek-ai/dsh-web-app'   # 交互面 WebUI（浏览器，使用部署环境的交互入口）
+  plugins:
+    - agent-default-model → provider: aigate, model: auto/coding   # AIGate 路由
+    - llm-pi-ai                → AIGate provider（AIGATE_ORCHESTRATOR_KEY）
+    - system-prompt            → 编排者 persona（分解/派发/验收，NEVER 长编码）
+    - plan-mode                → 分解先行（plan → delegate）
+persona: "您是星座编排者：拆解任务、经 ACP 派发给执行者、验收。绝不本地长编码。"
+# 交互形态：WebUI（浏览器）；编排者监听统一使用部署层面的非对外端口，
+# 冲突时递减，具体分配见部署配置。
+```
 
 **看护者不要求与编排者同平台**。硬约束是**独立故障域**（见下），而非「同框架」：同框架（独立升级轨道）或异构框架均可，视部署时的隔离成本与维护成本权衡。
 
@@ -55,7 +73,29 @@
 
 ## 决策
 
-**编码执行者采用 OpenCode（开源 headless 编码智能体）**。
+**编码执行者采用 OpenCode（开源 headless 编码智能体）；dsh（DeepSeek Harness）亦为推荐执行者（当前实际部署=dsh）。** 两条实现走同一套执行者硬约束（见下），平台可替换。
+
+**dsh 执行者配置表（插件声明，`executor/cordis.yml`）**——完整版与编排者/执行者对比见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
+
+```yaml
+# /cordis.yml: 执行者版插件装配（Headless executor）
+base:
+  - '@deepseek-ai/dsh-base'        # shell/fs/subprocess/agent-loop/sandbox 基础层
+executor:
+  - acp-agent        # ACP 服务端：@deepseek-ai/dsh-acp-demo + agent-spine-demo
+    provider: 编排者（AIGate）→ {aigate, auto/executor}
+  - fs-sandbox       # 沙箱（工作目录读写边界，未写上写墙：workdir 外拒绝）
+  - bash-sandbox     # 沙箱 bash（无 headless 挂起问题）
+persona: "您是执行者：写、测、调代码，不运行 git 写操作"
+# 权限模型：workspace-write（参见 04 章）。无头 CLI 下 skill/MCP 放行：
+#   skill: allow、工具前缀 allow；未放行自动拒绝
+```
+
+> 同一硬锁规范两种实现：
+> - **OpenCode** → `opencode.json` permissions 声明（deny 黑名单 + external_directory ask）
+> - **dsh** → 沙箱写墙（`mode: workspace-write` 强边界：workdir 外写入拒绝，
+>   无 OpenCode headless ask 挂起问题；`/tmp` 临时区豁免）
+> 详见[纪律传导](../04-harness.md) §3。
 
 ## 理由
 
@@ -134,6 +174,7 @@
 
 ## 后果
 
-- 执行者配置为 `opencode.json` + `baseURL` 指向模型网关。
-- 执行者纪律（permissions、doom_loop）由 OpenCode 配置承载（见[纪律传导](../04-harness.md)）。
+- 执行者配置：**OpenCode** → `opencode.json` + `baseURL` 指向模型网关；**dsh** → `executor/cordis.yml`（沙箱写墙模型）。两者均为推荐执行者，当前实际部署=dsh。
+- 执行者纪律：**OpenCode** 走 permissions 声明（deny/ask/allow）；**dsh** 走沙箱写墙（`workspace-write` 边界）——同一硬锁规范两种实现（见[纪律传导](../04-harness.md) §3）。
+- 编排者可用 Hermes（现状）或 DSH 编排者版；交互形态与插件装配见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
 - 若未来模型网关不再是 OpenAI-compatible，或 OpenCode 收紧 baseURL 自由度，或国产方案放开模型绑定并开源，本 ADR 需重新评估（ADR 存在的意义：决策可被新证据推翻）。

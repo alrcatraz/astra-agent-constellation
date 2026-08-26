@@ -2,7 +2,7 @@
 External A2A endpoint for the astra constellation.
 
 Exposes a minimal verification agent over the A2A Protocol v1.0 (JSON-RPC
-binding) on port 8000, bound to the external-facing interfaces (injected via
+binding) on the configured external port, bound to the external-facing interfaces (injected via
 environment variables). API-key authorisation is enforced in the Starlette
 app; the Agent Card declares the security scheme so clients know to send
 the key.

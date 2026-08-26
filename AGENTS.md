@@ -138,9 +138,9 @@ that track.)
    #   skills/.../references/a2a-interop.md  (real port plan)
    #   templates/cordis-executor.yml.example
    # Public-safe additions to KEEP (written sanitised):
-   #   docs/12-external-interop.md, templates/external-interop/*
+   #   docs/12-cross-agent-collab.md, templates/external-interop/*
    # Scan the staged tree for real host/IP/domain/machine-name hits
-   # (incl. any machine abbreviation such as <deployment host>) before committing.
+   # before committing; use the deployment-specific private denylist.
    git commit -S -m "... (sanitised)"
    ```
    The `(sanitised)` marker in the commit message identifies public-track
@@ -164,7 +164,7 @@ that track.)
    git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
    # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
    git rm --cached docs/10-acp-mapping.md ...          # whatever reappeared
-   git grep -nE "<deployment host>|<build host>|<deployment host>|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
+   git grep -nE "<PRIVATE-MACHINE>|<PRIVATE-DOMAIN>|<PRIVATE-IP>" -- # must be empty
    git commit -S -m "chore: purge leak re-import (sanitised)"
    git push github public:development                    # now fast-forward
    ```
@@ -212,7 +212,7 @@ HERMES_COPILOT_ACP_COMMAND="bash"
 HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
 ```
 
-- Local (<deployment host>): command above. Remote (<build host>): same via
+- Local (deployment host): command above. Remote (build host): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -220,8 +220,8 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/exa
   own env — the orchestrator must not hold the executor identity.
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
-- dsh sandbox (workspace-write) has no headless ask-hang; verified local
-  (<deployment host>) and remote (<build host>). Deployment manual:
+- dsh sandbox (workspace-write) has no headless ask-hang; verified on local
+  and remote build hosts. Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official

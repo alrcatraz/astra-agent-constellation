@@ -69,10 +69,8 @@ nav:
       - 看护者操作手册: 08-guardian-runbook.md
       - 演练剧本: 09-game-day.md
       - 总是知晓: 11-always-aware.md
-      - 对外互操作: 12-external-interop.md
-      - 内部多会话协作: 13-multi-session-collaboration.md
-      - Session 发现与注入: 14-session-discovery-and-injection.md
-      - DSH 编排者配置: 15-dsh-orchestrator-config.md
+      - 跨 Agent 协作与互操作: 12-cross-agent-collab.md
+      - DSH 编排者配置: 13-dsh-orchestrator-config.md
   - 采纳路径: 07-adoption.md
   - 决策记录:
       - references/0001-agent-platform-selection.md
@@ -80,3 +78,4 @@ nav:
       - references/0003-guardian-placement.md
       - references/0004-sync-layer-split.md
       - references/0005-observability-contract.md
+      - references/0007-delegation-semantics-and-session-governance.md

@@ -1,7 +1,7 @@
 # external-interop — 对外互操作端点模板
 
 对外互操作门面的**可运行参考实现**：为团体成员暴露 A2A 与 ANP 两类对外
-端点，供外部智能体/团体对等协作。设计决策见 ADR 0006 对外互操作门面，成员接入步骤见 [12 章对外互操作](../../docs/12-external-interop.md)。
+端点，供外部智能体/团体对等协作。设计治理见 [ADR 0007 委派语义与会话治理](../../docs/references/0007-delegation-semantics-and-session-governance.md)，成员接入步骤见 [12 章跨 Agent 协作与互操作（Part A）](../../docs/12-cross-agent-collab.md)。
 
 ## 文件
 
@@ -59,4 +59,4 @@ export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>
 - **ANP**：**did:wba only**（不再有 phase1 预共享形态）。原生 `DidWbaVerifier`
   现场网络解析对端 did:wba 身份并验签；未签名/错签名 401（`"must start with
   'did:wba:'"`）。需要公网子域 + 证书（身份文档须公开可达）。完整接入见
-  docs/12 §12.10-12.12。
+  docs/12-cross-agent-collab.md §12.10-12.12（Part A）。

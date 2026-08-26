@@ -1,10 +1,10 @@
 # 纪律传导
 
-编排者（Hermes）有一整套行为纪律（阶段门、研究门、变更防护、收尾检查）。执行者（OpenCode）没有 Hermes 的插件 API——**纪律不能复制，要分层传导**。
+编排者（当前=Hermes；DSH 编排者版同理）有一整套行为纪律（阶段门、研究门、变更防护、收尾检查）。执行者（当前=OpenCode；dsh 亦为推荐执行者）没有编排者的插件 API——**纪律不能复制，要分层传导**。
 
 ## 1. 三层传导模型
 
-| Hermes 的纪律机制 | 执行者的等价物 | 性质 |
+| 编排者的纪律机制（Hermes / DSH 编排者版） | 执行者的等价物（OpenCode / dsh） | 性质 |
 |:------------------|:--------------|:-----|
 | 研究门（先调研后动手） | 任务 brief 中写死「先读这些文件再改」；permissions 里 read 放行、edit 受限 | 编排层软约束 |
 | 变更门（改动要经过编排者） | permissions 硬门：`git push *` → deny，`git commit *` → ask | 工具层硬锁 |
@@ -35,8 +35,7 @@
 
 **ACP 化（ADR 0006）**：协议化派发时，上述字段映射为 ACP content blocks
 （Metadata → `_meta`、Objective/Scope/Stopping → text block、验收命令 →
-逐条 text block、AGENTS.md → resource_link），完整映射见
-10 章 ACP 内容映射。task-brief.md 仍是执行者的工作文档
+逐条 text block、AGENTS.md → resource_link）。task-brief.md 仍是执行者的工作文档
 与人类可读完整版，与 ACP 传输并行存在。
 
 ## 3. 工具层（硬锁）
@@ -59,7 +58,7 @@
 - **MUST NOT**：执行者被授予任何超出其工作目录的写权限。
 
 **dsh 执行者的权限模型（等价实现，2026-08-14 实测）**：dsh 用沙箱策略替代
-permissions 声明——`executor/cordis.yml`（模板 `templates/cordis-executor.yml.example`）
+permissions 声明——`executor/cordis.yml`（详 `dsh-executor-deployment` skill）
 中 `sandbox-policy` 设 `mode: workspace-write`：
 
 - **写墙**：workdir 外写入被沙箱直接拒绝并返回清晰错误（`file access denied ...

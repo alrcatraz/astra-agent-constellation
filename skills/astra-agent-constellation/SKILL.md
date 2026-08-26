@@ -123,7 +123,8 @@ by the orchestrator takes priority.
   state + status files.
 - When the orchestrator needs guardian action: update the registry / status
   files and let the cron cycle pick it up; do not send direct messages.
-- The guardian is **currently deferred (no carrier device)** — see PLAN.md.
+- The guardian is **currently deferred (no carrier device)** — see the
+  private release log.
   Its operations (update/recover/sync/report) are specified in 08
   guardian-runbook.md; activate when a device becomes available.
 
@@ -145,6 +146,14 @@ by the orchestrator takes priority.
   of "passed" is never conclusive.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
+- **Transport success ≠ generation success (verified P4-4, 2026-08-26).** A
+  protocol round trip that ends `TASK_STATE_COMPLETED` / `stopReason: end_turn`
+  can still hide a failed model generation (context overflow, cold provider,
+  wrong combo). Treat transport-complete and generated-text-usable as separate
+  acceptance layers; a delegated task is only done when the ACTUAL produced
+  artifact/text is usable. Do not fake a larger context declaration to make a
+  real model accept an oversized prompt — shrink the surface or route to a
+  separately authorised model instead.
 
 ### 6. Importing skills from outside (via AI Gate)
 
@@ -206,19 +215,10 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - **ADR**: decisions live in `docs/references/` (one file per decision;
   append a new ADR rather than rewriting old decisions).
 
-## Progress status (authoritative in PLAN.md)
+## Progress tracking
 
-- ✅ 0.1.0 released (private Gitea + signed v0.1.0 tag, rebuilt as 4
-  contribution commits); official v1.0.0 awaits AIGate development completion
-  + our own deployment verification.
-- ✅ Checklist items ①–⑦ (registry schema / task brief / runbook / game day /
-  gate contract / audit format / volume-2 English compliance).
-- ✅ 01 §2.1 routing table, 03 §3.4.1 gate implementation pointer
-  (2026-08-04).
-- ⏸ **Guardian deferred**: no carrier device; activate when a device is
-  available, in order "real registry → cron trigger chain → guardian skill →
-  game-day variant A" (PLAN.md).
-
+Project-specific release status belongs in the private release log, not in the
+public skill. This skill records reusable operating rules only.
 ## Pitfalls
 
 - `read_file` misdetects Chinese-dense documents as binary ("Binary file —
@@ -266,32 +266,32 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
 - A2A inter-agent protocol — enable/configure/test ladder (L0 discovery →
-  L1 self-loopback → L2 dual-instance peering), Hermes port allocation
-  (<INTERNAL-A2A-PORT>/<SERVE-PORT>/<DASHBOARD-PORT>/<PORT>/<PORT>/<PORT>/9222), agent-card verification:
-  `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
-  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
+  L1 self-loopback → L2 dual-instance peering), using deployment parameters
+  rather than hard-coded listener values; verify the agent card and then the
+  usable generated result. The current governance is in
+  `docs/references/0007-delegation-semantics-and-session-governance.md`.
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
-  *separate* concern from the internal Hermes A2A ladder above. When a task
+  *separate* concern from any internal Hermes A2A ladder. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
-  endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
+  endpoints, or did:wba identity resolution, consult `docs/12-cross-agent-collab.md`
   (general blueprint incl. did:wba 12.9, the **peer interop handbook 12.10**
   with copy-paste A2A card+message and ANP DID+signature clients and a failure
   triage table) + the operator's private copy of the external-endpoint docs.
   ANP trust is **did:wba only** (no phase1 pre-shared trust remains): identity
   `did:wba:<hostname>`, native network resolution, k1 identity + ES256 JWT
-  signatures — see `docs/12-external-interop.md` §12.9 (identity layer) and
+  signatures — see `docs/12-cross-agent-collab.md` §12.9 (identity layer) and
   §12.11 (enable did:wba operation checklist). For the dispatch bridge —
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
   templates live in `templates/external-interop/` (did:wba only).
-  Outward A2A/ANP ports (<A2A-PORT>/<ANP-PORT> on the primary
-  host) and the internal <INTERNAL-A2A-PORT> Hermes A2A must not be conflated.
+  Outward A2A/ANP listener ports and the internal Hermes A2A must not be
+  conflated.
 - **Internal multi-session collaboration** — how multiple Hermes sessions
   within *one* profile (the orchestrator's own team) coordinate via A2A.
   When a task spans multiple sessions/modules of the same agent and they must
   notify each other, request one another to actually modify code, or preserve
-  working memory across re-entry, consult `docs/13-multi-session-collaboration.md`
-  (docs/13, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
+  working memory across re-entry, consult `docs/12-cross-agent-collab.md`
+  (Part B, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
   default, request-collaboration, session-vs-global memory model, and the
   security default that `a2a_call` is NOT open by default. This is separate
-  from external interop (docs/12) and from the internal A2A ladder above.
+  from external interop (Part A) and from the internal A2A ladder above.
