@@ -12,6 +12,26 @@ DSH ships an **executor edition** (`examples/acp-agent/cordis.yml`, used in
 `executor/cordis.yml`) but no official orchestrator edition. This document
 presents both profiles side-by-side for reference.
 
+## Runtime Verification (2026-08-26)
+
+Real **DSH ACP run loop** verified end-to-end against a real AI Gate model from
+an isolated harness (temporary HOME/session/workspace, `127.0.0.1:20128` AI Gate
+route, disabled MCP/LSP for the short probe). The ACP server was launched from
+source as `node --import tsx packages/examples/acp-demo/src/bin.ts --config
+<config>` and driven over stdio JSON-RPC:
+
+1. `initialize` → `agentInfo deepseek-harness-acp`, capabilities baseline.
+2. `session/new` → returned a real `sessionId`.
+3. `session/prompt` → streamed an `agent_message_chunk` with the generated text,
+   then `stopReason: end_turn`.
+
+Key observation for anyone reproducing this: the ACP server is a **stdio
+server that exits on stdin EOF**. Launching it with a background helper and then
+writing nothing to stdin, or closing stdin, makes it appear to "start then exit"
+cleanly — that is the transport closing, not a model/config failure. Drive
+`initialize / session/new / session/prompt` across the same open stdin and
+read responses from stdout to see the real loop.
+
 ## Profile Comparison
 
 | Aspect | Executor Edition | Orchestrator Edition |
@@ -516,3 +536,164 @@ genuine long-lived dispatch across remote executors is the executor
 for validating configuration and model routing; choose the interactive surface
 for sustained orchestration. This bounds the scope of what a `headless`
 deploy verifies.
+
+## ACP session governance and recovery
+
+The ACP transport remains the orchestrator → executor seam. The following
+rules add lifecycle governance; they do not replace ACP or grant an executor
+orchestrator privileges.
+
+### Session roles and reuse
+
+A `worker_ref` identifies a reusable execution capability; an ACP `session_id`
+is one runtime instance of that capability. They MUST NOT be treated as the
+same identity.
+
+```yaml
+worker_ref: <executor>/<workspace>/<capability>
+transport: acp
+workspace: <WORKSPACE>
+profile: executor
+capabilities: [build, test, repair]
+state: available | busy | suspected_stale | completion_pending | draining | unavailable | quarantined
+session_policy: pooled | scoped | ephemeral
+```
+
+- **MUST**: reuse a worker session for related work items when workspace,
+  permission profile, credential scope, trust level and project are identical.
+- **MUST NOT**: create a new ACP session merely to receive a result, status
+  notice or completion message; the existing ACP channel carries the result.
+- **MUST NOT**: create one ACP session per DAG node by default. Related work
+  items share a pooled or scoped worker session.
+- **MAY**: use `ephemeral` for untrusted input, sensitive isolation, a changed
+  permission scope, a changed workspace, or a suspected prompt-injection
+  contamination. A changed trust boundary MUST force a new session.
+
+### Work item and attempt lifecycle
+
+A session can be reused, but each work item remains independently auditable:
+
+```text
+work item → task_id → attempt_id → lease → completion record
+```
+
+A retry MAY create a new `attempt_id` without creating a new session. A new
+session MAY be created for the same task when the old session is stale,
+contaminated, unavailable or outside the required trust scope. Neither action
+may overwrite the previous attempt's record.
+
+### Completion protocol and abnormal termination
+
+Workers SHOULD write the completion record before sending the final message.
+The recommended two-stage close is:
+
+1. `completion_prepare`: persist changed files, command outputs, verification
+   results and unresolved items;
+2. `completion_commit`: send the structured reference over the existing ACP
+   channel and release the lease.
+
+If the worker times out or dies after the main work but before the final
+message, the system MUST NOT mark it `idle` or immediately reassign the task.
+Use the following states:
+
+```text
+worker=session completion_pending | draining | suspected_stale
+attempt=possibly_completed | recovery_required
+```
+
+Recovery first reconciles the session, workspace, command logs and completion
+record. The result is one of:
+
+- `completed_without_report`: artefacts and verification are sufficient;
+- `recovery_required`: artefacts exist but verification is unknown; rerun
+  verification without repeating the write phase;
+- `failed_or_abandoned`: no trustworthy artefact exists; only then is a new
+  worker attempt eligible.
+
+The orchestrator MUST perform the outer acceptance commands independently even
+when recovery finds a prepared completion record.
+
+### Inbound-only messages and pending delegations
+
+A receiving orchestrator MUST use its existing listener/channel and a durable
+pending-delegation entry rather than opening a one-shot session just to wait.
+The pending entry records `delegation_id`, `task_id`, peer, transport, callback
+or pull location, deadline and communication budget. A message is a signal;
+the state store and verifiable artefacts are the facts.
+
+### Stale sessions, quarantine and garbage collection
+
+Session cleanup is archive-first and MUST be idempotent.
+
+| Session class | Detection | Action |
+|:--|:--|:--|
+| Empty shell | Started but no work item, no artefact, no pending message | Archive after short TTL |
+| Orphan | Parent task ended and no active reference remains | Drain, index, archive |
+| Completion-pending | Work artefact exists but final message/lease release is missing | Reconcile first; do not GC |
+| Suspended | Worker/session disappeared while an attempt remains active | Quarantine until reconcile |
+| Contaminated | Policy violation, prompt injection or wrong workspace | Quarantine; preserve evidence; never reuse |
+| Reusable idle | No active task, no pending message, same trust scope | Keep in pool or archive after idle TTL |
+
+GC MUST NOT delete active or unreconciled attempts, unaccepted artefacts,
+security evidence, acceptance records, command logs needed for verification, or
+append-only protocol/audit events. It may archive session payloads after the
+retention policy has been met, but the archive index MUST retain session,
+worker, task, attempt, reason and audit references.
+
+### Reconciliation after restart
+
+After an orchestrator or worker restart, the scheduler MUST remain paused until
+it reconciles:
+
+1. worker/session liveness;
+2. lease expiry and current attempt versions;
+3. pending delegations and unconsumed messages;
+4. workspace artefacts and running processes;
+5. completion records and acceptance references.
+
+Only then may `ready` work be claimed. This prevents a restart from turning an
+unknown attempt into a duplicate write or from treating a late result as a
+current result.
+
+## Real runtime verification (evidence from P4-4, 2026-08-26)
+
+Real runtime acceptance MUST be layered — do not collapse "transport made it"
+into "the model generated it":
+
+1. **Transport**: the listener answers and the Agent Card is readable;
+2. **Protocol**: a JSON-RPC request gets a response matched by `id` (async
+   notifications arrive interleaved, so never treat "next line" as the reply);
+3. **Task state**: a terminal state appears — A2A `TASK_STATE_COMPLETED`, or
+   ACP `stopReason: end_turn`;
+4. **Generation**: the actual returned text/artifact is usable and matches the
+   requested output.
+
+P4-4 produced a working listener, a successful `message/send`, and
+`TASK_STATE_COMPLETED` while the local model generation silently failed because
+the model's real `n_ctx=8192` could not contain the ~19K-token request Hermes
+injects. In that case:
+
+- MUST rely on the real model capability, never a fake 64K declaration;
+- either reduce the test surface, or route to a separately authorised model
+  with enough context;
+- record the provider's actual context capability and the failure separately
+  from the transport.
+
+DSH ACP is a stdin-driven stdio server. If stdin reaches EOF right after
+launch, the process may print only a Node SQLite experimental warning and exit
+0 — this indicates the transport closed, NOT that generation succeeded or the
+model is healthy. Drive `initialize → session/new → session/prompt` over the
+same open stdin; generated text arrives in `session/update`
+(`agent_message_chunk`), and the response is typically just `stopReason`.
+The project's `scripts/verify-runtime.sh` implements the A2A multi-layer check;
+ACP stdio still requires the client to keep stdin open and match by response id.
+
+A real AI-Gate probe MUST be short, isolated and traceable: the key is injected
+only into the one-shot child process and never written to repo/config/logs/
+output; the temp HOME/config/session/workspace/logs/trace and the process are
+removed afterwards.
+
+Before declaring any agent runtime ready, attach evidence for **all four** of
+the layers above, preserve stderr and exit code on startup failures, and re-run
+the cleanup check (free port, no lingering processes, unchanged production
+listeners). A round trip without usable output is an incomplete verification.

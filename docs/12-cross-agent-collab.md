@@ -11,6 +11,11 @@
 > profile 内的多个会话上下文** → Part B；是要**找回/续接一个既有会话**
 > → Part C。混淆三者的边界是多数多智能体方案设计偏差的根源。
 
+> **真实运行时验证（2026-08-26）**：隔离 A2A gateway（`127.0.0.1:19900`）
+> 完成 Agent Card、JSON-RPC `message/send`、任务完成状态和一次真实短文本
+> 生成；生成经 AI Gate 完成，未使用生产 A2A listener `9900`。传输层通过但
+> 生成不可用不能算通过；本次实际返回文本可用，故 A2A 真实生成验证通过。
+
 ---
 
 ## Part A — 对外互操作（团体边界与外部智能体协作）
@@ -586,6 +591,90 @@ Part B 覆盖的是 A2A context_id 已知的场景（编排者主动发起的协
 Session Discovery & Injection 机制发现并注入消息。二者互补——
 A2A 适合已知 target 的主动协作，Session Discovery 适合事后发现和召回。
 详见本章 Part C（会话发现与注入）。
+
+## 13.8 有界协作与一次性会话规避（ADR 0007）
+
+> 本节把 ADR 0007 的 A2A 部分落到队内/对等协作边界：解决
+> 「A2A 对话次数限制导致长协作被截断」与「为接收消息而产生一次性会话」
+> 两个实际问题，且不削弱防死循环的安全目的。
+
+### 13.8.1 A2A 消息分类（MUST）
+
+A2A 消息必须先分类，再决定是否期待回复：
+
+| 类型 | 语义 | 是否期待回复 |
+|:--|:--|:--|
+| 单向通知 | 状态更新、产物可用、依赖已满足、任务取消 | **否**（默认） |
+| 单次请求-响应 | 一次明确请求，期待一个结构化响应 | 是 |
+| 有界协作轮 | 少量澄清轮，`max_round_trips` 显式限定 | 是（限轮数） |
+| 持续工作会话 | 固定 `context_id` + 每次明确工作边界，状态写台账 | 按 work item |
+
+- **MUST NOT**：用调高 `A2A_MAX_PINGPONG_TURNS` 替代去环设计；防死循环是安全护栏，不能被「放开限制」削弱。
+- **MUST**：持续协作每次调用关联新的 `attempt_id` / `message_id` / `work_item_id`，禁止「继续」「再看看」这类无新工作边界的消息。
+- **MUST**：状态/知会类优先走共享台账 + 一次性通知，不靠消息来回传递——这本身不消耗对话轮次。
+- **MUST**：单向通知/ack/状态类消息**不消耗对话轮次（round-trip）**，但**仍计入总消息预算**——防止状态通知洪泛绕过 `max_messages` 上限（ADR 0007 离线验证发现的设计缺口，2026-08-25）。
+
+### 13.8.2 A2A 协作预算与去环（MUST）
+
+每个 A2A 协作任务携带**独立预算**：
+
+```yaml
+communication_budget:
+  max_round_trips: 3
+  max_messages: 8
+  max_wall_time_seconds: 900
+  max_tokens: <cap>
+  max_retries: 1
+  max_hops: 1
+```
+
+去环机制（四层，MUST）：
+
+1. **方向约束**：默认 `orchestrator → worker`；worker 不自动把同一任务回发原发送者，除非 `clarification_request` 且未超预算。
+2. **消息类型约束**：仅 `task_request` / `clarification_request` / `approval_result` / `dependency_ready` / `recovery_instruction` 可触发继续工作；`ack` / `status_notice` / `artifact_available` / `completion_report` 默认不触发新一轮。
+3. **因果链 ID**：`task_id`/`delegation_id`/`message_id`/`parent_message_id`/`attempt_id`/`hop_count`；重复因果链去重，不重复触发模型。
+4. **转发跳数**：`max_hops` 限制级联深度（默认 1），超限进 `loop_blocked` 并审计。
+
+- **MUST**：任一预算耗尽（`max_round_trips`/`max_messages`/`max_wall_time`/`max_tokens`/`max_retries`/`max_hops`）→ `budget_exhausted`，回到编排者，不自动继续。
+- **MUST**：A2A 达到预算、超时或无进展阈值时必须停止并回到编排者。
+
+### 13.8.3 接收消息不创建会话（MUST）
+
+- **MUST NOT**：为「等待执行者/对等 Agent 回消息」创建一次性 session 或 context。
+- **MUST**：每个 Agent 维护**常驻 listener** 作为唯一消息入站口；回复经既有出站通道交付。
+- **MUST**：待回结果用**共享状态层的 pending delegation 条目**承载（`callback` 或 `pull` 模式），不靠活性会话「挂在那边等」。
+
+```yaml
+pending:
+  delegation_id: D-42
+  task_id: T-7
+  to: agent-B
+  transport: a2a
+  callback:
+    mode: push_to_listener | pull_from_state
+    listener_ref: <agent>/listener
+    state_path: shared/status/D-42
+  budget: {...}
+  deadline: ...
+  state: awaiting_result
+```
+
+- 编排者只在用户真正需要现场交互时才升级为交互，且复用既有 context，不新增一次性会话。
+- ACP 侧同理：结果沿既有 ACP 连接回报，编排者不专门为接收开会话（见 13 章）。
+
+### 13.8.4 一次性接收会话的回收（若仍残留）
+
+| 一次性会话类型 | 判定 | 回收 |
+|:--|:--|:--|
+| 仅用于接收、已完成 | 交互完成 | 归档，不重复使用 |
+| 超时且无 pending 任务 | 超过 TTL | 归档，清 pending 引用 |
+| 升级交互成功 | 已并入主 context | 归档辅助 context |
+| 升级交互失败/半途 | 状态未知 | drain → 归档 + 证据保留 |
+| 孤儿 | 无 parent 引用、无任务 | drain → 归档 |
+| 污染（注入/越权） | 检测到 | quarantine，保留取证 |
+
+- **MUST**：GC 幂等（以 `session_id`/`interaction_id` 为键）；不删除未完成 pending、未验收产物、被引用上下文；不触碰审计。
+- **MUST NOT**：把可归档的一次性接收上下文误当审计事实删除；协议事件、委派、结果、回执 append-only 保留。
 ---
 ## Part C — 会话发现与注入
 
