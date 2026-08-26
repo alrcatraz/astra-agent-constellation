@@ -271,7 +271,7 @@ public skill. This skill records reusable operating rules only.
   usable generated result. The current governance is in
   `docs/references/0007-delegation-semantics-and-session-governance.md`.
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
-  *separate* concern from the internal Hermes A2A ladder above. When a task
+  *separate* concern from any internal Hermes A2A ladder. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
   endpoints, or did:wba identity resolution, consult `docs/12-cross-agent-collab.md`
   (general blueprint incl. did:wba 12.9, the **peer interop handbook 12.10**
