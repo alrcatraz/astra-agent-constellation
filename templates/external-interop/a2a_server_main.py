@@ -2,7 +2,7 @@
 External A2A endpoint for the astra constellation.
 
 Exposes a minimal verification agent over the A2A Protocol v1.0 (JSON-RPC
-binding) on port 9910, bound to the external-facing interfaces (injected via
+binding) on the configured external port, bound to the external-facing interfaces (injected via
 environment variables). API-key authorisation is enforced in the Starlette
 app; the Agent Card declares the security scheme so clients know to send
 the key.
@@ -45,7 +45,7 @@ from a2a.types import (
 from dispatch import run_hermes_oneshot, DispatchError
 
 EXTERNAL_HOSTS = [os.environ.get("EXTERNAL_HOST", "0.0.0.0")]
-PORT = int(os.environ.get("EXTERNAL_A2A_PORT", "9910"))
+PORT = int(os.environ.get("EXTERNAL_A2A_PORT", "8000"))
 ACCESS_KEY = os.environ.get("EXTERNAL_A2A_KEY", "")
 # Optional per-peer API keys -> external caller identity. Format:
 #   EXTERNAL_A2A_PEERS="alpha=<keyA>,beta=<keyB>"

@@ -1,7 +1,7 @@
 # external-interop — 对外互操作端点模板
 
 对外互操作门面的**可运行参考实现**：为团体成员暴露 A2A 与 ANP 两类对外
-端点，供外部智能体/团体对等协作。设计决策见 [ADR 0006 对外互操作门面](../../docs/references/0006-inter-agent-protocol-selection.md)，成员接入步骤见 [12 章跨 Agent 协作与互操作（Part A）](../../docs/12-cross-agent-collab.md)。
+端点，供外部智能体/团体对等协作。设计治理见 [ADR 0007 委派语义与会话治理](../../docs/references/0007-delegation-semantics-and-session-governance.md)，成员接入步骤见 [12 章跨 Agent 协作与互操作（Part A）](../../docs/12-cross-agent-collab.md)。
 
 ## 文件
 
@@ -25,14 +25,14 @@ export HERMES_DISPATCH_PROFILE=<profile，可选>
 export DISPATCH_IDENTITY_LABEL=<身份字段名，如 "external caller DID">
 
 # A2A
-export EXTERNAL_A2A_PORT=9910
+export EXTERNAL_A2A_PORT=<A2A-PORT>
 export EXTERNAL_A2A_KEY=<对外 A2A 任务的 API key>
 # 可选：按外部方区分身份（每个外部 peer 一个 key -> 标识）
 export EXTERNAL_A2A_PEERS="alpha=<keyA>,beta=<keyB>"
 export EXTERNAL_CARD_URL=https://<public-host>:<port>   # 对外可达的 AgentCard URL
 
 # ANP
-export EXTERNAL_ANP_PORT=9911
+export EXTERNAL_ANP_PORT=<ANP-PORT>
 export EXTERNAL_ANP_NAME=<对外展示名>
 export EXTERNAL_ANP_DID=did:wba:<domain>
 export ANP_ALLOWED_DOMAINS=<允许的 Host 域白名单，逗号分隔>

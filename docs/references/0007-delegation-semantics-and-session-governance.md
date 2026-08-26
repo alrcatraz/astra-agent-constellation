@@ -2,7 +2,7 @@
 
 - 状态：已接受（2026-08-25）
 - 运行时验证：已完成（2026-08-26；真实隔离 A2A 与真实隔离 DSH ACP 均完成短 prompt 生成）
-- 关联章节：[拓扑与角色](../01-topology.md)、[跨 Agent 协作与互操作](../12-cross-agent-collab.md)、[DSH 配置档](../13-dsh-orchestrator-config.md)、[ADR 0006](0006-inter-agent-protocol-selection.md)
+- 关联章节：[拓扑与角色](../01-topology.md)、[跨 Agent 协作与互操作](../12-cross-agent-collab.md)、[DSH 配置档](../13-dsh-orchestrator-config.md)
 
 ## 背景
 

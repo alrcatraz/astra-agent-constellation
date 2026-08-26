@@ -5,15 +5,15 @@
 > 会话分工/知会/记忆）、以及会话发现与注入（找回并续接既有会话）。
 > 三者边界先行：对外走 A2A/ANP 对等协议（Part A），队内走 A2A 知会
 > 与共享事实层（Part B），会话发现是二者都依赖的底层机制（Part C）。
-> 相关选型证据见 [ADR 0006 对外互操作门面](references/0006-inter-agent-protocol-selection.md)。
+> 相关治理见 [ADR 0007 委派语义与会话治理](references/0007-delegation-semantics-and-session-governance.md)。
 
 > 三层的判定口诀：对象是**团体外的独立实体** → Part A；是**同一份
 > profile 内的多个会话上下文** → Part B；是要**找回/续接一个既有会话**
 > → Part C。混淆三者的边界是多数多智能体方案设计偏差的根源。
 
-> **真实运行时验证（2026-08-26）**：隔离 A2A gateway（`127.0.0.1:19900`）
+> **真实运行时验证（2026-08-26）**：隔离 A2A gateway（临时本地端口）
 > 完成 Agent Card、JSON-RPC `message/send`、任务完成状态和一次真实短文本
-> 生成；生成经 AI Gate 完成，未使用生产 A2A listener `9900`。传输层通过但
+> 生成；生成经 AI Gate 完成，未使用生产 A2A listener。传输层通过但
 > 生成不可用不能算通过；本次实际返回文本可用，故 A2A 真实生成验证通过。
 
 ---
@@ -23,7 +23,7 @@
 > **目的**：定义团体与**外部**智能体/智能体团体对等互操作的边界、协议
 > 分层与操作步骤。内部接缝（编排者→执行者、看护者）仍遵守「禁直连、走
 > 共享事实层」纪律（见 [01 拓扑](01-topology.md)）；本章只描述**对外
-> 暴露面**。选型的理由与证据见 [ADR 0006 对外互操作门面](references/0006-inter-agent-protocol-selection.md)。
+> 暴露面**。选型的治理见 [ADR 0007 委派语义与会话治理](references/0007-delegation-semantics-and-session-governance.md)。
 
 ## 12.1 边界与判定
 
@@ -394,7 +394,7 @@ Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/ext
 的 `dispatch.py` 就是这座单跳桥：
 
 ```text
-外部方 --A2A(9910)/ANP(9911)--> 端点(验身份) --dispatch.py--> hermes -z
+外部方 --A2A(<A2A-PORT>)/ANP(<ANP-PORT>)--> 端点(验身份) --dispatch.py--> hermes -z
          （DID / peer 身份注入 prompt） <--------- 本机智能体执行 ---------
                                          最终回复返给外部方
 ```
@@ -416,8 +416,8 @@ Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/ext
 
 | 端点 | 鉴权 | 取身份 | 注入的 identity | 返回 |
 |:--|:--|:--|:--|:--|
-| A2A `POST /` (9910) | `X-API-Key`（单 key 或 `EXTERNAL_A2A_PEERS` 每 peer 一 key） | `EXTERNAL_A2A_PEERS` 命中 → `request.state.peer_name`；单 key → `"external"` | `peer_name` | 本机 Hermes 最终回复（agent artifact） |
-| ANP `POST /rpc` `/task` (9911) | RFC 9421 签名 + did:wba | 验签通过的 `Context.did` | `context.did` | `{"message": <回复>, "origin_did": <DID>}` |
+| A2A `POST /` (`<A2A-PORT>`) | `X-API-Key`（单 key 或 `EXTERNAL_A2A_PEERS` 每 peer 一 key） | `EXTERNAL_A2A_PEERS` 命中 → `request.state.peer_name`；单 key → `"external"` | `peer_name` | 本机 Hermes 最终回复（agent artifact） |
+| ANP `POST /rpc` `/task` (`<ANP-PORT>`) | RFC 9421 签名 + did:wba | 验签通过的 `Context.did` | `context.did` | `{"message": <回复>, "origin_did": <DID>}` |
 
 ### 12.12.3 部署要点（生产 unit）
 
@@ -426,8 +426,9 @@ Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/ext
   （AGENTS「deployment specifics go to the private copy」）。
 - **必须显式设 `HERMES_DISPATCH_BIN` 为绝对路径**（systemd user 环境默认
   PATH 不含 `~/.local/bin`，不设会 `FileNotFoundError`）。
-- 端点监听：对外 9910/9911 绑 0.0.0.0；**内部 hermes A2A（9900）应只绑
-  127.0.0.1**，与对外端口物理分隔，且 9900 永不经公网反代暴露。
+- 端点监听：对外 `<EXTERNAL-A2A-PORT>` 绑对外接口；**内部 hermes A2A
+  (`<INTERNAL-A2A-PORT>`) 应只绑本机回环接口**，与对外端口物理分隔，且内部
+  端点永不经公网反代暴露。
 - 部署后跨机验收：用另一台已 did:wba 成员的身份（它自己的 key + did 文档）
   经**公网**门面签调用 `/rpc` `/task`，期望 200 + `result.message` = 本机
   hostname 类真实执行输出 + `origin_did` = 调用方 DID（12.11.3 的闭环，但
@@ -576,11 +577,11 @@ Hermes 智能体**完成（而不是让端点 echo 或空转）。`templates/ext
 - **Anti-loop 护栏**：单 context 的 ping-pong 轮次上限由
   `A2A_MAX_PINGPONG_TURNS`（默认 5）限制，避免 agent↔agent 死循环；
   合理的长协作可提高该值或换新 context_id。
-- **端口规划**（勿混淆）：Hermes 内部 A2A = **9900**；9901/9119 是其他
-  角色（父端 serve / dashboard）；对外 A2A/ANP = **9910/9911**（主宿）。
-- **自检命令**：规划 A2A 调用前
-  `curl 127.0.0.1:9900/.well-known/agent-card.json` 返回 agent card，
-  `agent.url` 即自环 `a2a_call` 的目标。
+- **端口规划**（勿混淆）：内部 A2A、父端 serve、dashboard 与对外 A2A/ANP
+  必须使用互不冲突的部署参数；具体值不得写入可公开同步的蓝图。
+- **自检命令**：规划 A2A 调用前，以部署参数构造本机回环 URL，确认
+  `/.well-known/agent-card.json` 返回 agent card；`agent.url` 即自环
+  `a2a_call` 的目标。
 - **确定性 context_id**：项目会话用固定的 `project-core`/`project-modA` 等
   作为 context_id，使 `a2a_history`/`a2a_call` 可预期、跨重启存活。
 

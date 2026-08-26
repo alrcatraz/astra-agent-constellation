@@ -194,7 +194,7 @@ def _native_auth_config(allowed_domains: list[str]):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("EXTERNAL_ANP_PORT", "9911"))
+    port = int(os.environ.get("EXTERNAL_ANP_PORT", "8001"))
     uvicorn.run(
         build_app(),
         host="0.0.0.0",

@@ -27,15 +27,15 @@
 profile:
   bundles:
     - '@deepseek-ai/dsh-base'      # 基础层（approval/goal/agent-loop 等已在其中）
-    - '@deepseek-ai/dsh-web-app'   # 交互面 WebUI（浏览器，走 SD-WAN 9801/9901）
+    - '@deepseek-ai/dsh-web-app'   # 交互面 WebUI（浏览器，使用部署环境的交互入口）
   plugins:
     - agent-default-model → provider: aigate, model: auto/coding   # AIGate 路由
     - llm-pi-ai                → AIGate provider（AIGATE_ORCHESTRATOR_KEY）
     - system-prompt            → 编排者 persona（分解/派发/验收，NEVER 长编码）
     - plan-mode                → 分解先行（plan → delegate）
 persona: "您是星座编排者：拆解任务、经 ACP 派发给执行者、验收。绝不本地长编码。"
-# 交互形态：WebUI（浏览器）；端口规则 = 所有编排者(含 Hermes serve)走 9901，
-#   9901 被前一个智能体占用则走 9801（HC01 本机 9901=Hermes serve，故 DSH 走 9801）。
+# 交互形态：WebUI（浏览器）；编排者监听统一使用部署层面的非对外端口，
+# 冲突时递减，具体分配见部署配置。
 ```
 
 **看护者不要求与编排者同平台**。硬约束是**独立故障域**（见下），而非「同框架」：同框架（独立升级轨道）或异构框架均可，视部署时的隔离成本与维护成本权衡。

@@ -35,8 +35,7 @@
 
 **ACP 化（ADR 0006）**：协议化派发时，上述字段映射为 ACP content blocks
 （Metadata → `_meta`、Objective/Scope/Stopping → text block、验收命令 →
-逐条 text block、AGENTS.md → resource_link），完整映射见
-[10 章 ACP 内容映射](10-acp-mapping.md)。task-brief.md 仍是执行者的工作文档
+逐条 text block、AGENTS.md → resource_link）。task-brief.md 仍是执行者的工作文档
 与人类可读完整版，与 ACP 传输并行存在。
 
 ## 3. 工具层（硬锁）
@@ -59,7 +58,7 @@
 - **MUST NOT**：执行者被授予任何超出其工作目录的写权限。
 
 **dsh 执行者的权限模型（等价实现，2026-08-14 实测）**：dsh 用沙箱策略替代
-permissions 声明——`executor/cordis.yml`（模板 `templates/cordis-executor.yml.example`）
+permissions 声明——`executor/cordis.yml`（详 `dsh-executor-deployment` skill）
 中 `sandbox-policy` 设 `mode: workspace-write`：
 
 - **写墙**：workdir 外写入被沙箱直接拒绝并返回清晰错误（`file access denied ...
