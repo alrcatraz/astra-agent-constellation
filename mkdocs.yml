@@ -80,3 +80,4 @@ nav:
       - references/0004-sync-layer-split.md
       - references/0005-observability-contract.md
       - references/0006-inter-agent-protocol-selection.md
+      - references/0007-delegation-semantics-and-session-governance.md

@@ -145,6 +145,14 @@ by the orchestrator takes priority.
   of "passed" is never conclusive.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
+- **Transport success ≠ generation success (verified P4-4, 2026-08-26).** A
+  protocol round trip that ends `TASK_STATE_COMPLETED` / `stopReason: end_turn`
+  can still hide a failed model generation (context overflow, cold provider,
+  wrong combo). Treat transport-complete and generated-text-usable as separate
+  acceptance layers; a delegated task is only done when the ACTUAL produced
+  artifact/text is usable. Do not fake a larger context declaration to make a
+  real model accept an oversized prompt — shrink the surface or route to a
+  separately authorised model instead.
 
 ### 6. Importing skills from outside (via AI Gate)
 

@@ -125,6 +125,28 @@ Principle: **use Hermes official defaults** — they are disjoint by design.
 Non-Hermes on HC01: 9993 ZeroTier, 9090/1053 mihomo, 8091 llama, 20128
 aigate — all outside the 99xx Hermes band.
 
+## Real short-generation probe (verified 2026-08-26)
+
+A transport-only A2A result is insufficient. The isolated gateway probe must
+verify the whole path:
+
+1. Bind the temporary A2A listener to a free loopback port, never the existing
+   listener.
+2. Check the Agent Card and JSON-RPC `message/send` response.
+3. Require `TASK_STATE_COMPLETED` **and usable generated text**. A task state
+   alone can hide a provider/context failure.
+4. If the local model is too small for Hermes' injected prompt/tool schema,
+   do not fake its context declaration. Use a separately authorised test
+   gateway/model or reduce the test surface; record the actual model context.
+5. For a real AI Gate probe, inject the key into the temporary child process
+   only, keep it out of configs/logs/output, and clean all temporary files and
+   processes afterwards.
+
+The P4-4 probe confirmed that an isolated A2A transport can be healthy while
+model generation fails independently. The successful final probe therefore
+required a short real generation and returned usable text, not merely a
+completed task envelope.
+
 ## Pitfalls
 
 - **9901 trap**: `hermes serve --port 9901` (the TUI/API session itself)
