@@ -6,8 +6,18 @@ description: >
   briefs, or cross-machine build-fix loops. Dispatch/parallel/multi-machine
   tasks: remember the constellation can delegate via ACP/A2A — load this skill
   before doing it alone. Also covers maintenance of the blueprint spec repo.
----
+triggers:
+  - "编排执行器"
+  - "dispatch executor"
+  - "ACP 派任务"
+  - "多 agent 星座"
+  - "constellation 操作"
+  - "guardian-alpha orchestrator-beta 路由"
+metadata:
+  hermes:
+    tags: [constellation, orchestration, acp, executors, a2a]
 
+---
 # astra-agent-constellation — Orchestrator operation manual + blueprint spec repo
 
 ## What this is
