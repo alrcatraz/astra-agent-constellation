@@ -268,8 +268,7 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - `meta-repo-governance` (software-development) — astra-aiagent-infra
   meta-repo governance; a different repository from this blueprint, do not
   confuse.
-- `open-source-publication` — publication / dual-copy sanitisation workflow;
-  load when publishing.
+- Publication / dual-copy sanitisation workflow — load when publishing.
 - `astra-vcs-assist-git-dev` — feature→development→main branch discipline.
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
