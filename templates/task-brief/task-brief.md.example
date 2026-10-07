@@ -60,6 +60,31 @@ stuck, what was tried, the failure evidence, and the suggested way forward.
 - **SHOULD**: when the task will clearly overshoot its time/effort budget,
   report progress and the revised estimate before continuing.
 
+## 3.5 Budget (MUST)
+
+The initial working budget for this task. This is a contract term, not a
+death sentence — running long is not a failure; overshooting silently is.
+
+- **Initial budget**: <e.g. 30 min wall-clock of focused work, or N turns>.
+  The orchestrator sets this when dispatching.
+- **70% report (MUST)**: at ~70% of the budget consumed, the executor MUST
+  report current progress, a revised estimate, and a requested extension,
+  corroborated by its progress signal (files changed / commands run / tests
+  passing). Reporting after expiry is meaningless — the decision point is
+  before the deadline.
+- **Approval (orchestrator-only)**: extensions are granted explicitly by the
+  orchestrator and recorded; large extensions escalate to the operator. The
+  executor requests, never self-approves (acceptance/approval authority never
+  leaves the orchestrator — ADR 0007 §9.2).
+- **Grace on expiry**: when the budget expires with a request pending, the
+  executor keeps running in grace and waits for the verdict — it is NOT
+  killed (killing discards completed work; abnormal completion goes to
+  recovery, ADR 0007 §4).
+- **Resource guard (separate, non-negotiable)**: a hard ceiling (e.g. 10×
+  the budget) is a quota-layer safety net against runaway tasks; hitting it
+  forces wrap-up + recovery, never a silent timeout. Negotiable budget (this
+  section) and non-negotiable guard are distinct.
+
 ## 4. Acceptance Criteria (MUST)
 
 Each criterion is an exact command and its expected result. The executor
