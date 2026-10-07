@@ -53,14 +53,14 @@ Discipline: short tasks MUST NOT be delegated to an executor; long tasks MUST
 NOT be tackled solo; when in doubt and the user is present, direct execution
 by the orchestrator takes priority.
 
-### 2. Invoking the executor (OpenCode, via ACP)
+### 2. Invoking the executor (via ACP — OpenCode / dsh both recommended)
 
 - When splitting a task, generate a task brief (copy
   `templates/task-brief/task-brief.md.example` →
   `tasks/<ID>-<name>.md`): Metadata (agent-ref resolved via the registry) +
   Objective + Scope (including out-of-scope) + 5 Stopping Conditions +
   Acceptance Criteria (commands with expected results) + Hand-off + DoD.
-- **Preferred: ACP dispatch (verified 2026-08-14)** — Hermes' native
+- **Preferred: ACP dispatch (transport verified 2026-08-14; OpenCode example)** — Hermes' native
   `copilot-acp` provider drives the executor over the Agent Client
   Protocol. Configure once per executor host (env vars, or
   `providers.copilot-acp` in config.yaml if the schema supports command/args):
@@ -77,17 +77,24 @@ by the orchestrator takes priority.
   body → text blocks, AGENTS.md → resource_link, acceptance → per-command
   blocks). Client MUST consume the `session/update` notification stream —
   reply body arrives as `agent_message_chunk`, RESP is only the end marker.
-- **dsh executor (DeepSeek Harness, verified 2026-08-14)** — same ACP dispatch,
-  different server command:
+- **dsh executor (DeepSeek Harness) — the other recommended executor** — same ACP dispatch,
+  different server command (since rc.2 the official profile system:
+  `--profile acp --patch <overlay>`; the local form below matches
+  `HERMES_COPILOT_ACP_*` in `~/.hermes/.env`):
   ```bash
+  # local (current form)
+  export HERMES_COPILOT_ACP_COMMAND="bash"
+  export HERMES_COPILOT_ACP_ARGS="-c 'cd <DSH_ROOT> && node apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml'"
+  # cross-machine: same start command wrapped in ssh
   export HERMES_COPILOT_ACP_COMMAND="ssh"
-  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> \"cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml\""
+  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> \"cd <DSH_ROOT> && node apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml\""
   ```
-  dsh replaces OpenCode for new deployments (sandbox write-wall has no
-  headless ask-hang; 36-tool set incl. LSP/subagents/terminal; MCP tool naming
-  `mcp__<server>__<tool>` matches Hermes). Deployment/config manual:
-  `dsh-executor-deployment` skill. Both executors emit `session/update`
-  chunks + committed RESP — the client-side handling is identical.
+  Both executors are recommended (ADR 0001, no precedence); choose per need —
+  dsh brings a sandbox write-wall (no headless ask-hang), a 36-tool set incl.
+  LSP/subagents/terminal, and MCP tool naming `mcp__<server>__<tool>` that
+  matches Hermes; deployment/config manual: `dsh-executor-deployment` skill.
+  Both executors emit `session/update` chunks + committed RESP — the
+  client-side handling is identical.
 - **Fallback: `opencode run`** (pre-ACP, still works): same machine
   `opencode run "..." --continue --format json`; remote machine: ssh to the
   build host.
@@ -145,6 +152,14 @@ by the orchestrator takes priority.
   of "passed" is never conclusive.
 - Decision records accompany the report (05 §2); session JSONL is queryable
   and free of credentials.
+- **Transport success ≠ generation success (verified P4-4, 2026-08-26).** A
+  protocol round trip that ends `TASK_STATE_COMPLETED` / `stopReason: end_turn`
+  can still hide a failed model generation (context overflow, cold provider,
+  wrong combo). Treat transport-complete and generated-text-usable as separate
+  acceptance layers; a delegated task is only done when the ACTUAL produced
+  artifact/text is usable. Do not fake a larger context declaration to make a
+  real model accept an oversized prompt — shrink the surface or route to a
+  separately authorised model instead.
 
 ### 6. Importing skills from outside (via AI Gate)
 
@@ -260,8 +275,7 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - `meta-repo-governance` (software-development) — astra-aiagent-infra
   meta-repo governance; a different repository from this blueprint, do not
   confuse.
-- `open-source-publication` — publication / dual-copy sanitisation workflow;
-  load when publishing.
+- Publication / dual-copy sanitisation workflow — load when publishing.
 - `astra-vcs-assist-git-dev` — feature→development→main branch discipline.
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
@@ -273,13 +287,13 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
   *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
-  endpoints, or did:wba identity resolution, consult `docs/12-external-interop.md`
+  endpoints, or did:wba identity resolution, consult `docs/12-cross-agent-collab.md`
   (general blueprint incl. did:wba 12.9, the **peer interop handbook 12.10**
   with copy-paste A2A card+message and ANP DID+signature clients and a failure
   triage table) + the operator's private copy of the external-endpoint docs.
   ANP trust is **did:wba only** (no phase1 pre-shared trust remains): identity
   `did:wba:<hostname>`, native network resolution, k1 identity + ES256 JWT
-  signatures — see `docs/12-external-interop.md` §12.9 (identity layer) and
+  signatures — see `docs/12-cross-agent-collab.md` §12.9 (identity layer) and
   §12.11 (enable did:wba operation checklist). For the dispatch bridge —
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
@@ -290,8 +304,8 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   within *one* profile (the orchestrator's own team) coordinate via A2A.
   When a task spans multiple sessions/modules of the same agent and they must
   notify each other, request one another to actually modify code, or preserve
-  working memory across re-entry, consult `docs/13-multi-session-collaboration.md`
-  (docs/13, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
+  working memory across re-entry, consult `docs/12-cross-agent-collab.md`
+  (Part B, v0.2.7): avatars vs true multi-agent boundary, A+B shared-truth
   default, request-collaboration, session-vs-global memory model, and the
   security default that `a2a_call` is NOT open by default. This is separate
-  from external interop (docs/12) and from the internal A2A ladder above.
+  from external interop (Part A) and from the internal A2A ladder above.
