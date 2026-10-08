@@ -197,7 +197,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("EXTERNAL_ANP_PORT", "8001"))
     uvicorn.run(
         build_app(),
-        host="0.0.0.0",
+        host=os.environ.get("EXTERNAL_HOST", "0.0.0.0"),
         port=port,
         proxy_headers=True,
         forwarded_allow_ips="*",  # trust X-Forwarded-* set by the gateway nginx

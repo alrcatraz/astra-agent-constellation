@@ -36,7 +36,8 @@
 
 **ACP 化（ADR 0006）**：协议化派发时，上述字段映射为 ACP content blocks
 （Metadata → `_meta`、Objective/Scope/Stopping → text block、验收命令 →
-逐条 text block、AGENTS.md → resource_link）。task-brief.md 仍是执行者的工作文档
+逐条 text block、AGENTS.md → resource_link），完整映射见
+10 章 ACP 内容映射。task-brief.md 仍是执行者的工作文档
 与人类可读完整版，与 ACP 传输并行存在。
 
 ## 3. 工具层（硬锁）

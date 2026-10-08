@@ -4,12 +4,3 @@ __pycache__/
 *.pyc
 *.db
 .DS_Store
-
-# Private-only content — MUST stay off the public (GitHub) track.
-PLAN.md
-agent-registry/
-tasks/
-docs/10-acp-mapping.md
-docs/references/0006-inter-agent-protocol-selection.md
-skills/astra-agent-constellation/references/a2a-interop.md
-templates/cordis-executor.yml.example

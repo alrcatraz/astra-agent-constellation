@@ -3,7 +3,7 @@
 - 状态：已接受（2026-08-25）
 - 子版本：1.1（2026-10-07 补丁，新增 §9 派发超时与预算语义）
 - 运行时验证：已完成（2026-08-26；真实隔离 A2A 与真实隔离 DSH ACP 均完成短 prompt 生成）
-- 关联章节：[拓扑与角色](../01-topology.md)、[跨 Agent 协作与互操作](../12-cross-agent-collab.md)、[DSH 配置档](../13-dsh-orchestrator-config.md)
+- 关联章节：[拓扑与角色](../01-topology.md)、[跨 Agent 协作与互操作](../12-cross-agent-collab.md)、[DSH 配置档](../13-dsh-orchestrator-config.md)、ADR 0006
 
 > **子版本说明**：本 ADR 自 1.1 起以**补丁/子版本**演进（不新立 ADR）。原计划的
 > `0008-dispatch-timeout-semantics` 内容已并入 §9——派发超时/预算/常驻是 §3/§4
