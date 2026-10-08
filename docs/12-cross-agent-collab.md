@@ -12,7 +12,8 @@
 > → Part C。混淆三者的边界是多数多智能体方案设计偏差的根源。
 
 > **真实运行时验证（2026-08-26）**：隔离 A2A gateway（`127.0.0.1:19900`）
-> 完成 Agent Card、JSON-RPC `message/send`、任务完成状态和一次真实短文本
+> 完成 Agent Card、JSON-RPC `message/send`（当时 SDK 的 0.3 方法名；v1.0 起为
+> `SendMessage` + `A2A-Version` 头，见模板 README）、任务完成状态和一次真实短文本
 > 生成；生成经 AI Gate 完成，未使用生产 A2A listener `9900`。传输层通过但
 > 生成不可用不能算通过；本次实际返回文本可用，故 A2A 真实生成验证通过。
 
@@ -191,7 +192,7 @@ DID 目录。本节记通用落地要点（不对应任何具体 agent）。
 
 | 层 | 端点形态 | 用途 | 鉴权 |
 |:--|:--|:--|:--|
-| **A2A** | `<HOST>/` 上 JSON-RPC，卡片在 `/.well-known/agent.json` | 投递任务、会话式协作（agent 对 agent） | API key 头 / 白名单 |
+| **A2A** | `<HOST>/` 上 JSON-RPC，卡片在 `/.well-known/agent-card.json` | 投递任务、会话式协作（agent 对 agent） | API key 头 / 白名单 |
 | **ANP** | `<HOST>/rpc`，身份在 `/<agent>/ad.json` + DID 文档 | 受信任的**接口调用**（函数式 RPC） | did:wba 身份 + HTTP 签名 |
 
 - 需要「把一个任务交给对方 agent 去执行、拿回结果」→ **A2A**。
@@ -205,7 +206,7 @@ DID 目录。本节记通用落地要点（不对应任何具体 agent）。
 
 1. **发现**：拿到对方对外域名 `<HOST>`（成员登记/目录/部署方提供）。
 2. **拉取身份与能力**：
-   - A2A：`GET https://<HOST>/.well-known/agent.json` → Agent Card
+   - A2A：`GET https://<HOST>/.well-known/agent-card.json` → Agent Card
      （`name`、`skills[]`、`supportedInterfaces[0].url`。
      注意 **client 连的是卡片里声明的 URL**，不是你自己拼的地址）。
    - ANP：`GET https://<HOST>/agent/ad.json` → AgentDescription（接口列表）
@@ -215,7 +216,10 @@ DID 目录。本节记通用落地要点（不对应任何具体 agent）。
    （见 12.9.4）。若对端仍是旧身份，需先在服务端迁移为 did:wba，否则
    连接握手必败。
 4. **按目标层鉴权并发起调用**：
-   - A2A：带 API key 头，POST JSON-RPC `message.send`（见 12.10.3）。
+   - A2A：带 API key 头 + `A2A-Version: 1.0` 头，POST JSON-RPC 方法
+     `SendMessage`（v1.0 用 PascalCase 方法名；`message/send` 是 0.3 旧名，
+     现调必得 `-32601 Method not found`。详见模板 README「A2A 原生
+     JSON-RPC 直呼」与 12.10.3）。
    - ANP：用 DID 文档里的密钥构造 RFC 9421 HTTP 签名，POST `/rpc`
      （见 12.10.4）。
 5. **验证响应**：成功回包带 `result`；鉴权失败为 401/403；签名错误为
@@ -248,10 +252,12 @@ async def main():
                 print("result:", final[-1])
 ```
 
-对应带鉴权的 curl 仅为健康检查（真正的 A2A 消息通常走 SDK/流式）：
+卡片属发现层、**免 key**（0006 §鉴权分级「发现 = 公开」；规范亦载卡片
+MAY 含公开信息、SHOULD NOT 含敏感凭据）——下列 curl 为健康检查
+（真正的 A2A 消息通常走 SDK/流式）：
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "https://<HOST>/.well-known/agent.json" \
+curl -s -H "X-API-Key: $KEY" "https://<HOST>/.well-known/agent-card.json" \
   | python3 -m json.tool | head
 ```
 
