@@ -1,6 +1,7 @@
 # ADR 0001：智能体平台选型——双子星与编码执行者
 
 - 状态：已接受（2026-08）
+- 子版本：1.1（2026-10-08 补丁：章节标签跟随重编号、dsh 执行者配置指针跟随 rc.2 profile 形态；选型结论未变）
 - 关联章节：[拓扑与角色](../01-topology.md)、[双星模式](../06-gemini-pattern.md)
 
 ## 背景
@@ -20,7 +21,7 @@
 
 **编排者采用 Hermes Agent（开源智能体框架）——现状，MUST**；**DSH 编排者版亦为满足编排职责的可用实现**（同一角色可适配不同 Agent，可担任≠必须担任，见[拓扑与角色](../01-topology.md)）。当前实际编排者=Hermes。
 
-**DSH 编排者版配置表（插件声明，`~/.dsh/profiles/orchestrator/cordis.patch.yml`）**——完整版与编排者/执行者对比见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
+**DSH 编排者版配置表（插件声明，`~/.dsh/profiles/orchestrator/cordis.patch.yml`）**——完整版与编排者/执行者对比见 [13 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
 
 ```yaml
 # ~/.dsh/profiles/orchestrator/cordis.patch.yml（用户层，叠加在 bundle 之上）
@@ -75,7 +76,7 @@ persona: "您是星座编排者：拆解任务、经 ACP 派发给执行者、�
 
 **编码执行者采用 OpenCode（开源 headless 编码智能体）；dsh（DeepSeek Harness）亦为推荐执行者（当前实际部署=dsh）。** 两条实现走同一套执行者硬约束（见下），平台可替换。
 
-**dsh 执行者配置表（插件声明，`executor/cordis.yml`）**——完整版与编排者/执行者对比见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
+**dsh 执行者配置表（插件声明，执行者 profile overlay：`executor/acp-overlay.yml`，rc.2 形态）**——完整版与编排者/执行者对比见 [13 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
 
 ```yaml
 # /cordis.yml: 执行者版插件装配（Headless executor）
@@ -174,7 +175,7 @@ persona: "您是执行者：写、测、调代码，不运行 git 写操作"
 
 ## 后果
 
-- 执行者配置：**OpenCode** → `opencode.json` + `baseURL` 指向模型网关；**dsh** → `executor/cordis.yml`（沙箱写墙模型）。两者均为推荐执行者，当前实际部署=dsh。
+- 执行者配置：**OpenCode** → `opencode.json` + `baseURL` 指向模型网关；**dsh** → 执行者 profile（rc.2：`--profile acp --patch executor/acp-overlay.yml`，沙箱写墙模型）。两者均为推荐执行者，当前实际部署=dsh。
 - 执行者纪律：**OpenCode** 走 permissions 声明（deny/ask/allow）；**dsh** 走沙箱写墙（`workspace-write` 边界）——同一硬锁规范两种实现（见[纪律传导](../04-harness.md) §3）。
-- 编排者可用 Hermes（现状）或 DSH 编排者版；交互形态与插件装配见 [16 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
+- 编排者可用 Hermes（现状）或 DSH 编排者版；交互形态与插件装配见 [13 章 DSH 编排者配置](../13-dsh-orchestrator-config.md)。
 - 若未来模型网关不再是 OpenAI-compatible，或 OpenCode 收紧 baseURL 自由度，或国产方案放开模型绑定并开源，本 ADR 需重新评估（ADR 存在的意义：决策可被新证据推翻）。
