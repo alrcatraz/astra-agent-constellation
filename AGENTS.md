@@ -203,13 +203,14 @@ that track.)
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
 `copilot-acp` provider is the ACP client** — configure
 `HERMES_COPILOT_ACP_COMMAND`/`HERMES_COPILOT_ACP_ARGS` to point at the
-executor. **dsh (DeepSeek Harness) is the recommended production executor since
-2026-08-15** (OpenCode remains available as legacy):
+executor. The blueprint recommends **both** executors equally (OpenCode and
+dsh — ADR 0001, no precedence); **the executor deployed in production today
+is dsh (DeepSeek Harness)**, so the sample below is that one:
 
 ```bash
 # ~/.hermes/.env — orchestrator side holds ONLY the launch command, no key
 HERMES_COPILOT_ACP_COMMAND="bash"
-HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
+HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node apps/cli/lib/bin.js --profile acp --patch executor/acp-overlay.yml'"
 ```
 
 - Local (the home host): command above. Remote (the dev orchestrator host): same via

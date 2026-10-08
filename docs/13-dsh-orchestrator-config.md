@@ -494,11 +494,14 @@ execute in the gate.
 
 ### Boot / launch (canonical)
 
-The executor edition boots directly from a `cordis.yml` via tsx
-(`node --import tsx …/bin.ts --config executor/cordis.yml`). The orchestrator
-edition boots through the **official `--profile` launcher** instead — the same
-path as the shipped `headless` and `web` profiles — giving it layered
-configuration (bundle layers below, your `cordis.patch.yml` overlay above),
+The executor edition boots through the **official `--profile` launcher** on
+0.1.7-rc.2 and later (`node apps/cli/lib/bin.js --profile acp --patch
+executor/acp-overlay.yml`) — the same launcher family as the orchestrator
+edition: base/bundle layers underneath, the patched overlay on top. The
+pre-rc.2 direct form (`node --import tsx …/bin.ts --config
+executor/cordis.yml`) still boots on ≤0.1.6 but is superseded here; the
+orchestrator edition boots the same way — giving it layered configuration
+(bundle layers below, your `cordis.patch.yml` overlay above),
 hot-reload of the user layer, and `dsh plugin` for out-of-tree plugins.
 
 ```bash
