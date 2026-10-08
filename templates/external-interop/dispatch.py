@@ -16,6 +16,12 @@ Environment variables (all optional):
     HERMES_DISPATCH_BIN      Path to the Hermes executable (default "hermes").
     HERMES_DISPATCH_PROFILE  Hermes profile name, e.g. "home" (default: none).
     HERMES_DISPATCH_WORKDIR  Working directory for the one-shot run.
+    HERMES_DISPATCH_TIMEOUT  Acceptance window in seconds for one dispatch
+                             (default 300). This is the *acceptance* window —
+                             does the task get taken and answered — not the
+                             work's lifetime (ADR 0007 §9, layer ①): work that
+                             must outlive it goes through a durable primitive
+                             instead of a longer one-shot.
     DISPATCH_IDENTITY_LABEL  Noun for the caller identity in the prompt, e.g.
                              "external caller DID" or "external A2A peer".
 
@@ -30,6 +36,7 @@ import subprocess
 HERMES_BIN = os.environ.get("HERMES_DISPATCH_BIN", "hermes")
 HERMES_PROFILE = os.environ.get("HERMES_DISPATCH_PROFILE", "")
 HERMES_WORKDIR = os.environ.get("HERMES_DISPATCH_WORKDIR", "")
+DISPATCH_TIMEOUT = int(os.environ.get("HERMES_DISPATCH_TIMEOUT", "300"))
 IDENTITY_LABEL = os.environ.get("DISPATCH_IDENTITY_LABEL", "external caller")
 
 
@@ -40,14 +47,17 @@ def _profile_args() -> list[str]:
 
 
 def _prompt(task: str, identity: str | None) -> str:
-    """Build the one-shot prompt: identity context line + the task itself."""
-    prelude = "\n".join(
-        (
-            "You are handling a task delivered through this machine's external"
-            f" interop boundary. The authenticated {IDENTITY_LABEL} is:"
-            f" {identity or 'anonymous'}"
-            "Complete the requested task and reply with your final answer only."
-        )
+    """Build the one-shot prompt: identity context line + the task itself.
+
+    The two sentences stay on separate lines and the identity never glues onto
+    the next word — each fragment is explicit text, not a sequence for a join
+    to walk character by character.
+    """
+    prelude = (
+        "You are handling a task delivered through this machine's external"
+        " interop boundary. The authenticated"
+        f" {IDENTITY_LABEL} is: {identity or 'anonymous'}\n"
+        "Complete the requested task and reply with your final answer only."
     )
     return f"{prelude}\n\n[task]\n{task}"
 
@@ -55,11 +65,15 @@ def _prompt(task: str, identity: str | None) -> str:
 def run_hermes_oneshot(
     task: str,
     identity: str | None = None,
-    timeout: int = 300,
+    timeout: int | None = None,
 ) -> str:
     """Execute ``task`` on the local Hermes agent as a one-shot and return its
     final reply. Raises DispatchError on a non-zero exit or timeout.
+
+    ``timeout`` defaults to ``DISPATCH_TIMEOUT`` (acceptance window, layer ①).
     """
+    if timeout is None:
+        timeout = DISPATCH_TIMEOUT
     cmd = [HERMES_BIN, *_profile_args(), "-z", _prompt(task, identity)]
     try:
         proc = subprocess.run(

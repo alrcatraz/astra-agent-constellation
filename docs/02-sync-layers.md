@@ -11,7 +11,7 @@
 | 层 | 内容 | 真源 | 同步机制 | 谁消费 |
 |:---|:-----|:-----|:---------|:-------|
 | **L1 项目规则** | 构建禁令、验证命令、代码卫生条款、语言约定 | 仓库内 `AGENTS.md` | git（随仓库零成本同步） | 所有操作该仓库的智能体 |
-| **L2 全局配置** | opencode.json、settings.json、工具链配置 | dotfiles 仓库 | git（`~/.config` 符号链接或拉取脚本） | 各机器上的智能体运行时 |
+| **L2 全局配置** | opencode.json、settings.json、工具链配置；执行者的运行时 profile（分层见 §L2） | dotfiles 仓库（通用全局层）＋执行者自身仓库（profile 层） | git（`~/.config` 符号链接或拉取脚本；profile 随执行者仓 checkout） | 各机器上的智能体运行时 |
 | **L3 技能/程序记忆** | 可复用流程、排查路径、修复步骤 | skills 仓库（git 双副本：公开 + 私有） | git + 生命周期同步工具 | 各智能体按需加载 |
 | **L4 跨机知识** | 服务配置、事故记录、参考数据 | 知识库（KB）+ llm-wiki | git 化/服务化 | 所有智能体按需查询 |
 | **L5 凭证** | API key、令牌、连接串 | KeePassXC + GPG 加密 YAML（三层库） | 集中保管，**永不进 git** | 各智能体经环境变量注入引用 |
@@ -37,7 +37,8 @@
 ### L2 全局配置（dotfiles）
 
 - **MUST**：所有智能体的全局配置（OpenCode 的 `opencode.json`、shell 配置等）以 dotfiles 仓库为真源。
-- **MUST NOT**：凭证进 dotfiles。API key 用环境变量从凭证库注入。
+- **MUST**：执行者的**运行时 profile 配置**（如 dsh 的 `executor/*.yml` overlay，定义工具集、MCP 端点与权限策略）以**执行者自身仓库**为真源、随其 checkout 同步——不并入 dotfiles；dotfiles 只承载通用全局层。两层分工：dotfiles = 这台机器长什么样，执行者仓 = 这个执行者怎么跑。
+- **MUST NOT**：凭证进 dotfiles。API key 用环境变量从凭证库注入；每机执行者密钥（`.env`）由执行者仓 `.gitignore` 排除，只存在于该机器上，按 L5 注入。
 - **SHOULD**：用符号链接或一次性拉取脚本将 dotfiles 部署到各机器，而不是手工复制。
 
 ### L3 技能（skills）

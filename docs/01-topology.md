@@ -56,7 +56,8 @@
 > **多个编排者之间的对等协作（未来）走 A2A**；
 > **与团体外智能体/团体的对外互操作走 A2A + ANP 分层**（任务对话 + 身份信任，
 > 见 [12 跨 Agent 协作与互操作](12-cross-agent-collab.md)）。本节 3.1–3.3 描述当前
-> 实现形态：**ACP 化已落地**——task-brief 经 ACP content blocks 传递；此前的 `opencode run` 字符串契约是过渡
+> 实现形态：**ACP 化已落地**——task-brief 经 ACP content blocks 传递（映射见
+> 10 ACP 内容映射）；此前的 `opencode run` 字符串契约是过渡
 > 形态，已被 ACP 取代（见 ADR 0006「被否决的选项」）。
 
 ### 3.1 编排者 → 执行者（同机）

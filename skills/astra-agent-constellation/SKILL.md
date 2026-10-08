@@ -130,8 +130,7 @@ by the orchestrator takes priority.
   state + status files.
 - When the orchestrator needs guardian action: update the registry / status
   files and let the cron cycle pick it up; do not send direct messages.
-- The guardian is **currently deferred (no carrier device)** — see the
-  private release log.
+- The guardian is **currently deferred (no carrier device)** — see PLAN.md.
   Its operations (update/recover/sync/report) are specified in 08
   guardian-runbook.md; activate when a device becomes available.
 
@@ -222,10 +221,19 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
 - **ADR**: decisions live in `docs/references/` (one file per decision;
   append a new ADR rather than rewriting old decisions).
 
-## Progress tracking
+## Progress status (authoritative in PLAN.md)
 
-Project-specific release status belongs in the private release log, not in the
-public skill. This skill records reusable operating rules only.
+- ✅ 0.1.0 released (private Gitea + signed v0.1.0 tag, rebuilt as 4
+  contribution commits); official v1.0.0 awaits AIGate development completion
+  + our own deployment verification.
+- ✅ Checklist items ①–⑦ (registry schema / task brief / runbook / game day /
+  gate contract / audit format / volume-2 English compliance).
+- ✅ 01 §2.1 routing table, 03 §3.4.1 gate implementation pointer
+  (2026-08-04).
+- ⏸ **Guardian deferred**: no carrier device; activate when a device is
+  available, in order "real registry → cron trigger chain → guardian skill →
+  game-day variant A" (PLAN.md).
+
 ## Pitfalls
 
 - `read_file` misdetects Chinese-dense documents as binary ("Binary file —
@@ -267,18 +275,17 @@ public skill. This skill records reusable operating rules only.
 - `meta-repo-governance` (software-development) — astra-aiagent-infra
   meta-repo governance; a different repository from this blueprint, do not
   confuse.
-- `open-source-publication` — publication / dual-copy sanitisation workflow;
-  load when publishing.
+- Publication / dual-copy sanitisation workflow — load when publishing.
 - `astra-vcs-assist-git-dev` — feature→development→main branch discipline.
 - `repo-language-convention` — basis of the reader-facing-Chinese /
   internal-British-English split.
 - A2A inter-agent protocol — enable/configure/test ladder (L0 discovery →
-  L1 self-loopback → L2 dual-instance peering), using deployment parameters
-  rather than hard-coded listener values; verify the agent card and then the
-  usable generated result. The current governance is in
-  `docs/references/0007-delegation-semantics-and-session-governance.md`.
+  L1 self-loopback → L2 dual-instance peering), Hermes port allocation
+  (<INTERNAL-A2A-PORT>/<SERVE-PORT>/<DASHBOARD-PORT>/<PORT>/<PORT>/<PORT>/9222), agent-card verification:
+  `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
+  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
-  *separate* concern from any internal Hermes A2A ladder. When a task
+  *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
   endpoints, or did:wba identity resolution, consult `docs/12-cross-agent-collab.md`
   (general blueprint incl. did:wba 12.9, the **peer interop handbook 12.10**
@@ -291,8 +298,8 @@ public skill. This skill records reusable operating rules only.
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
   templates live in `templates/external-interop/` (did:wba only).
-  Outward A2A/ANP listener ports and the internal Hermes A2A must not be
-  conflated.
+  Outward A2A/ANP ports (<A2A-PORT>/<ANP-PORT> on the primary
+  host) and the internal <INTERNAL-A2A-PORT> Hermes A2A must not be conflated.
 - **Internal multi-session collaboration** — how multiple Hermes sessions
   within *one* profile (the orchestrator's own team) coordinate via A2A.
   When a task spans multiple sessions/modules of the same agent and they must

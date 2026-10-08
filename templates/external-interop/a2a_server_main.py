@@ -2,7 +2,7 @@
 External A2A endpoint for the astra constellation.
 
 Exposes a minimal verification agent over the A2A Protocol v1.0 (JSON-RPC
-binding) on the configured external port, bound to the external-facing interfaces (injected via
+binding) on port 8000, bound to the external-facing interfaces (injected via
 environment variables). API-key authorisation is enforced in the Starlette
 app; the Agent Card declares the security scheme so clients know to send
 the key.
@@ -124,6 +124,14 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         self._single_key = single_key
 
     async def dispatch(self, request: Request, call_next):
+        # Discovery layer stays public (ADR 0006 鉴权分级: 发现 = 公开):
+        # the Agent Card is what an outside peer fetches *before* it holds any
+        # key — gating it would make discovery chicken-and-egg. This matches
+        # the ANP side, whose ad.json is likewise unauthenticated. Task entry
+        # points below stay gated.
+        if request.url.path.startswith("/.well-known/"):
+            request.state.peer_name = "discovery"
+            return await call_next(request)
         key = request.headers.get("X-API-Key", "")
         if self._peers:
             identity = next((name for name, k in self._peers.items() if k == key), None)
@@ -200,4 +208,6 @@ def build_app() -> Starlette:
 
 if __name__ == "__main__":
     app = build_app()
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    # EXTERNAL_HOST owns the bind address (same variable the card URL default
+    # reads) — honour it instead of hardcoding every interface.
+    uvicorn.run(app, host=EXTERNAL_HOSTS[0], port=PORT)

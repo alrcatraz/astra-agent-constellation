@@ -15,7 +15,7 @@ presents both profiles side-by-side for reference.
 ## Runtime Verification (2026-08-26)
 
 Real **DSH ACP run loop** verified end-to-end against a real AI Gate model from
-an isolated harness (temporary HOME/session/workspace, `127.0.0.1:<ISOLATED-GATE-PORT>` AI Gate
+an isolated harness (temporary HOME/session/workspace, `127.0.0.1:<GATE-PORT>` AI Gate
 route, disabled MCP/LSP for the short probe). The ACP server was launched from
 source as `node --import tsx packages/examples/acp-demo/src/bin.ts --config
 <config>` and driven over stdio JSON-RPC:
@@ -65,7 +65,7 @@ These plugins are common to both executor and orchestrator editions:
         displayName: Astra AI Gate
         apiKeyEnv: AIGATE_<PROFILE>_KEY   # executor or orchestrator
         api: openai-completions
-        baseURL: http://<GATE-HOST>:<GATE-PORT>/v1
+        baseURL: http://<deployment host>.<overlay-domain>:<GATE-PORT>/v1
         models:
           - id: auto/<profile>
             name: AIGate <profile>
@@ -160,7 +160,7 @@ These plugins are common to both executor and orchestrator editions:
 #   config:
 #     serverName: markitdown
 #     transport: streamable-http
-#     url: http://<GATE-HOST>:<GATE-PORT>/api/mcp/servers/markitdown/stream
+#     url: http://<deployment host>.<overlay-domain>:<GATE-PORT>/api/mcp/servers/markitdown/stream
 #     headers:
 #       Authorization: !!js '`Bearer ${process.env.AIGATE_<PROFILE>_KEY}`'
 #     failOnStartupError: true
@@ -169,7 +169,7 @@ These plugins are common to both executor and orchestrator editions:
 #   config:
 #     serverName: pageindex
 #     transport: streamable-http
-#     url: http://<GATE-HOST>:<GATE-PORT>/api/mcp/servers/pageindex/stream
+#     url: http://<deployment host>.<overlay-domain>:<GATE-PORT>/api/mcp/servers/pageindex/stream
 #     headers:
 #       Authorization: !!js '`Bearer ${process.env.AIGATE_<PROFILE>_KEY}`'
 #     failOnStartupError: true
@@ -178,7 +178,7 @@ These plugins are common to both executor and orchestrator editions:
 #   config:
 #     serverName: astra-kb
 #     transport: streamable-http
-#     url: http://<GATE-HOST>:<GATE-PORT>/api/mcp/servers/astra-kb/stream
+#     url: http://<deployment host>.<overlay-domain>:<GATE-PORT>/api/mcp/servers/astra-kb/stream
 #     headers:
 #       Authorization: !!js '`Bearer ${process.env.AIGATE_<PROFILE>_KEY}`'
 #     failOnStartupError: true
@@ -494,11 +494,14 @@ execute in the gate.
 
 ### Boot / launch (canonical)
 
-The executor edition boots directly from a `cordis.yml` via tsx
-(`node --import tsx …/bin.ts --config executor/cordis.yml`). The orchestrator
-edition boots through the **official `--profile` launcher** instead — the same
-path as the shipped `headless` and `web` profiles — giving it layered
-configuration (bundle layers below, your `cordis.patch.yml` overlay above),
+The executor edition boots through the **official `--profile` launcher** on
+0.1.7-rc.2 and later (`node apps/cli/lib/bin.js --profile acp --patch
+executor/acp-overlay.yml`) — the same launcher family as the orchestrator
+edition: base/bundle layers underneath, the patched overlay on top. The
+pre-rc.2 direct form (`node --import tsx …/bin.ts --config
+executor/cordis.yml`) still boots on ≤0.1.6 but is superseded here; the
+orchestrator edition boots the same way — giving it layered configuration
+(bundle layers below, your `cordis.patch.yml` overlay above),
 hot-reload of the user layer, and `dsh plugin` for out-of-tree plugins.
 
 ```bash

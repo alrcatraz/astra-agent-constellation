@@ -123,28 +123,44 @@ that track.)
 3b. **Advance Gitea `main` by PR** (not direct push): open a pull request
    `development` → `main` on Gitea and merge it. Gitea CLI/API or the web
    UI both work; the merge must land as a merge commit on `main`.
-4. **Build the public branch from local `main`** (do NOT `git merge main`
-   into `public` — that drags private files back in). Reconcile `public` to
-   the sanitised target:
+4. **Project onto the public line** — the public branch carries its OWN
+   root history (rebuilt 2026-10-08: the pre-rebuild line shared ancestry
+   with the private track, so historical snapshots of `PLAN.md`, the real
+   registry and `docs/10` were all fetchable from the public remote — only
+   the tip tree had ever been sanitised). Never `checkout -B public main`:
+   that grafts private ancestry back onto the public line and recreates the
+   leak. Carry main's CONTENT onto public's existing history instead
+   (and still never `git merge main` into `public` — same drag-in):
    ```
-   git checkout main
-   git checkout -B public             # re-point public at main's tree
-   git rm --cached PLAN.md            # progression log, private-only
-   git rm --cached agent-registry/registry.yaml   # real registry
-   git rm --cached -r tasks           # task-brief instances, real refs
+   git checkout public                # own-root line; parent = current public tip
+   git read-tree -u --reset main      # main's full tree -> index + worktree
+   # Drop the private-only set from index AND worktree:
+   git rm -r --cached PLAN.md agent-registry/registry.yaml tasks
+   rm -rf PLAN.md agent-registry/registry.yaml tasks
    # Files kept OUT of public entirely (leak topology / real hosts):
    #   docs/10-acp-mapping.md          (real test hosts)
    #   docs/references/0006-...inter-agent-protocol-selection.md
    #   skills/.../references/a2a-interop.md  (real port plan)
    #   templates/cordis-executor.yml.example
+   #   (+ delete each from the worktree too)
    # Public-safe additions to KEEP (written sanitised):
    #   docs/12-cross-agent-collab.md, templates/external-interop/*
-   # Scan the staged tree for real host/IP/domain/machine-name hits
-   # before committing; use the deployment-specific private denylist.
+   # Generalise private values to the public placeholder vocabulary
+   #   (<HOST> / <GATE-PORT> / <A2A-PORT> / <ANP-PORT> / <overlay-domain> ...),
+   #   and drop nav lines / markdown links that pointed at removed files.
+   # Gate 1 — value sweep must come back empty:
+   git grep -nE "<real machine|domain|IP|port patterns>" --   # must be empty
+   # Gate 2 — no private ancestry reachable from the projection:
+   git merge-base --is-ancestor development HEAD && echo LEAK || echo OK
+   # Gate 3 — the projected docs still build:
+   .venv/bin/mkdocs build --strict
    git commit -S -m "... (sanitised)"
    ```
    The `(sanitised)` marker in the commit message identifies public-track
    commits whose content was scrubbed — preserve it when amending.
+   Residual (accepted): GitHub's `refs/pull/*` hidden refs cannot be deleted
+   and still anchor some pre-rebuild SHAs; they are GitHub-side only and
+   unreachable from branches, tags and releases.
 4b. **Public reconcile trap (2026-08-18, v0.2.7)**: if the GitHub
    `development` branch has diverged from the freshly-rebuilt `public`
    (e.g. older public commits were already merged into GitHub `main`), a PR
@@ -164,7 +180,7 @@ that track.)
    git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
    # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
    git rm --cached docs/10-acp-mapping.md ...          # whatever reappeared
-   git grep -nE "<PRIVATE-MACHINE>|<PRIVATE-DOMAIN>|<PRIVATE-IP>" -- # must be empty
+   git grep -nE "<deployment host>|<build host>|<deployment host>|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
    git commit -S -m "chore: purge leak re-import (sanitised)"
    git push github public:development                    # now fast-forward
    ```
@@ -203,16 +219,17 @@ that track.)
 The orchestrator→executor dispatch seam uses ACP. **Hermes' native
 `copilot-acp` provider is the ACP client** — configure
 `HERMES_COPILOT_ACP_COMMAND`/`HERMES_COPILOT_ACP_ARGS` to point at the
-executor. **dsh (DeepSeek Harness) is the recommended production executor since
-2026-08-15** (OpenCode remains available as legacy):
+executor. The blueprint recommends **both** executors equally (OpenCode and
+dsh — ADR 0001, no precedence); **the executor deployed in production today
+is dsh (DeepSeek Harness)**, so the sample below is that one:
 
 ```bash
 # ~/.hermes/.env — orchestrator side holds ONLY the launch command, no key
 HERMES_COPILOT_ACP_COMMAND="bash"
-HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml'"
+HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node apps/cli/lib/bin.js --profile acp --patch executor/acp-overlay.yml'"
 ```
 
-- Local (deployment host): command above. Remote (build host): same via
+- Local (<deployment host>): command above. Remote (<build host>): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -220,8 +237,8 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node --import tsx packages/exa
   own env — the orchestrator must not hold the executor identity.
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
-- dsh sandbox (workspace-write) has no headless ask-hang; verified on local
-  and remote build hosts. Deployment manual:
+- dsh sandbox (workspace-write) has no headless ask-hang; verified local
+  (<deployment host>) and remote (<build host>). Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official
