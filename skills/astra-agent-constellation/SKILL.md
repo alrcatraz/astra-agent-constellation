@@ -53,14 +53,14 @@ Discipline: short tasks MUST NOT be delegated to an executor; long tasks MUST
 NOT be tackled solo; when in doubt and the user is present, direct execution
 by the orchestrator takes priority.
 
-### 2. Invoking the executor (OpenCode, via ACP)
+### 2. Invoking the executor (via ACP — OpenCode / dsh both recommended)
 
 - When splitting a task, generate a task brief (copy
   `templates/task-brief/task-brief.md.example` →
   `tasks/<ID>-<name>.md`): Metadata (agent-ref resolved via the registry) +
   Objective + Scope (including out-of-scope) + 5 Stopping Conditions +
   Acceptance Criteria (commands with expected results) + Hand-off + DoD.
-- **Preferred: ACP dispatch (verified 2026-08-14)** — Hermes' native
+- **Preferred: ACP dispatch (transport verified 2026-08-14; OpenCode example)** — Hermes' native
   `copilot-acp` provider drives the executor over the Agent Client
   Protocol. Configure once per executor host (env vars, or
   `providers.copilot-acp` in config.yaml if the schema supports command/args):
@@ -77,17 +77,24 @@ by the orchestrator takes priority.
   body → text blocks, AGENTS.md → resource_link, acceptance → per-command
   blocks). Client MUST consume the `session/update` notification stream —
   reply body arrives as `agent_message_chunk`, RESP is only the end marker.
-- **dsh executor (DeepSeek Harness, verified 2026-08-14)** — same ACP dispatch,
-  different server command:
+- **dsh executor (DeepSeek Harness) — the other recommended executor** — same ACP dispatch,
+  different server command (since rc.2 the official profile system:
+  `--profile acp --patch <overlay>`; the local form below matches
+  `HERMES_COPILOT_ACP_*` in `~/.hermes/.env`):
   ```bash
+  # local (current form)
+  export HERMES_COPILOT_ACP_COMMAND="bash"
+  export HERMES_COPILOT_ACP_ARGS="-c 'cd <DSH_ROOT> && node apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml'"
+  # cross-machine: same start command wrapped in ssh
   export HERMES_COPILOT_ACP_COMMAND="ssh"
-  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> \"cd ~/Projects/dsh && node --import tsx packages/examples/acp-demo/src/bin.ts --config executor/cordis.yml\""
+  export HERMES_COPILOT_ACP_ARGS="-T -p 2222 <BUILD_HOST> \"cd <DSH_ROOT> && node apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml\""
   ```
-  dsh replaces OpenCode for new deployments (sandbox write-wall has no
-  headless ask-hang; 36-tool set incl. LSP/subagents/terminal; MCP tool naming
-  `mcp__<server>__<tool>` matches Hermes). Deployment/config manual:
-  `dsh-executor-deployment` skill. Both executors emit `session/update`
-  chunks + committed RESP — the client-side handling is identical.
+  Both executors are recommended (ADR 0001, no precedence); choose per need —
+  dsh brings a sandbox write-wall (no headless ask-hang), a 36-tool set incl.
+  LSP/subagents/terminal, and MCP tool naming `mcp__<server>__<tool>` that
+  matches Hermes; deployment/config manual: `dsh-executor-deployment` skill.
+  Both executors emit `session/update` chunks + committed RESP — the
+  client-side handling is identical.
 - **Fallback: `opencode run`** (pre-ACP, still works): same machine
   `opencode run "..." --continue --format json`; remote machine: ssh to the
   build host.

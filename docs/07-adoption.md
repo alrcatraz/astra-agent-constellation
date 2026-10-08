@@ -20,9 +20,9 @@
 
 目标：验证「编排者 → 执行者 → 验收」全链路。
 
-- 在开发机部署 OpenCode，接入模型网关（baseURL）。
+- 在开发机部署**执行者**（OpenCode 或 dsh，两者均为推荐执行者、不分先后，以 ACP server 形态运行），接入模型网关（baseURL）。
 - 用**一个真实 feature**（如 astra-aigate 的某个实现）走全流程：brief → 执行 → 决策记录 → 编排者重跑验证 → diff 审查 → 用户确认。
-- 配置 permissions 硬门（git push deny、doom_loop）。
+- 配置执行者硬门（同一规范两种实现，见 04 §3）：OpenCode 走 permissions 声明（git push deny、doom_loop），dsh 走沙箱写墙（workspace-write 边界）。
 
 **验收**：feature 落地且通过 CI 等效验证；执行者全程未直接与用户对话。
 
@@ -31,7 +31,7 @@
 目标：消除跨机构建-修复循环的传输成本。
 
 - **先出现痛点再部署**：确认开发机上反复出现「构建-修复」循环（如 Next.js 编译只允许在构建机）。
-- 在构建机部署 OpenCode，经 ssh 由编排者调用。
+- 在构建机部署**执行者**（OpenCode 或 dsh，均为推荐），经 ssh 由编排者以 ACP 调用（ssh 包装启动命令，协议不变）。
 - 大文件传输走流式管道（`podman save | ssh podman load`），不用 scp 大 tar。
 
 **验收**：构建-修复循环在一个编排者会话内闭环，无大文件传输卡死。

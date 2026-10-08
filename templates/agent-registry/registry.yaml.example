@@ -14,6 +14,11 @@
 #   and the entry within it, so a single source of truth stays single:
 #     host    -> device-ref, resolves against the device/connection layer
 #                (credential store: connection.paths, multi-path priority)
+#                Addressing rule (ADR 0006, §寻址): resolution prefers the
+#                overlay FQDN (each network's built-in DNS zone name) over a
+#                bare IP, because IPs move with the overlay while the FQDN
+#                stays resolvable. Concrete zone names and FQDN lists belong
+#                to the private copy only.
 #     model   -> tier-ref, resolves against the model config layer (L2)
 #                tier semantics: 06 §5.1 (standard = full capability,
 #                light = cost/speed; concrete models live in L2, not here)

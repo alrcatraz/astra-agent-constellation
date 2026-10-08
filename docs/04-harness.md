@@ -1,6 +1,6 @@
 # 纪律传导
 
-编排者（当前=Hermes；DSH 编排者版同理）有一整套行为纪律（阶段门、研究门、变更防护、收尾检查）。执行者（当前=OpenCode；dsh 亦为推荐执行者）没有编排者的插件 API——**纪律不能复制，要分层传导**。
+编排者（当前=Hermes；DSH 编排者版同理）有一整套行为纪律（阶段门、研究门、变更防护、收尾检查）。执行者（OpenCode 与 dsh 均为推荐执行者，不分先后；当前实际部署=dsh）没有编排者的插件 API——**纪律不能复制，要分层传导**。
 
 ## 1. 三层传导模型
 
@@ -17,6 +17,7 @@
 
 - **MUST**：执行者永远只通过编排者的调用出现（headless、非交互）。
 - **MUST**：编排者在任务 brief 中注入约束：「只实现 X，不碰 Y，跑验证命令 Z」。
+- **MUST**：brief 注入**预算**（Budget）：初始工作预算写入 brief（与 Stopping Conditions 并列），执行者用到约 70% 时上报「现状 + 新估算 + 延期请求」（进度信号佐证），**延期由编排者显式批准并留痕**、大额升级给用户；到期先进 grace 不掐死（ADR 0007 §9.2）。资源硬顶（如 10× 预算）属配额层，不可协商。
 - **MUST**：执行者返回后，编排者**重跑验证** + diff 审查——执行者自报「过了」不算数。
 - **MUST**：编排者与用户一同分析确认项目规划与细节，再拆任务给执行者。
 - **MUST**：技术路线行不通时，执行者**停下汇报**（卡点 + 已尝试 + 失败证据 + 建议方向），**不得自行换方案**继续推进——换路线是编排者的决定。
@@ -58,7 +59,7 @@
 - **MUST NOT**：执行者被授予任何超出其工作目录的写权限。
 
 **dsh 执行者的权限模型（等价实现，2026-08-14 实测）**：dsh 用沙箱策略替代
-permissions 声明——`executor/cordis.yml`（详 `dsh-executor-deployment` skill）
+permissions 声明——`executor/cordis.yml`（模板 `templates/cordis-executor.yml.example`）
 中 `sandbox-policy` 设 `mode: workspace-write`：
 
 - **写墙**：workdir 外写入被沙箱直接拒绝并返回清晰错误（`file access denied ...

@@ -34,6 +34,8 @@
 - **MUST**：分流是编排者的决策，不自动执行——短任务也需确认任务性质后再走对应链路。
 - **MUST NOT**：把「该编排者直接执行的短任务」拆给执行者（增加延迟与上下文损耗）；把「该走执行者的长任务」自己硬啃（违反 01 §2 SHOULD）。
 - **SHOULD**：拿不准时，按「用户在场 → 编排者直接执行」优先，用户明确要求长编码/构建任务时才拆执行者。
+- **超时与常驻（ADR 0007 §9）**：派发走执行者时，**超时分三层**——①收活窗口（秒级，接单判定，失败重派）/ ②存活检测（进度信号，失联进恢复判定不杀工作）/ ③工作生命周期（task brief 写 Budget，可协商、到期是决策点非死刑），**不再用单一派发窗口同时承担三种语义**。执行者以 **ACP server 形态常驻**（跨智能体协作要求），编排者跨任务经 `session/load`/`resume` 接回，握手只在会话建立时付一次。
+- **持久执行原语（ADR 0007 §9.6）**：派发前先问「这份工作要不要活得比发起它的会话/进程更久」——要，则**MUST** 用持久原语（定时任务会话 / 后台常驻进程）承接，**MUST NOT** 用进程本地的派生子会话（发起方退出即丢工作）；「持久」只解决存活，层③ Budget 与资源硬顶照旧。
 
 ## 2.2 委派协调语义（统一任务委派基座）
 
@@ -53,21 +55,26 @@
 > **编排者 ↔ 看护者的状态交换走共享事实层**（异步 git，无实时协议）；
 > **多个编排者之间的对等协作（未来）走 A2A**；
 > **与团体外智能体/团体的对外互操作走 A2A + ANP 分层**（任务对话 + 身份信任，
-> 见 [12 跨 Agent 协作与互操作](12-cross-agent-collab.md)）。本节 3.1–3.3 描述当前实现形态，
-> ACP 化落地后传输层升级为 ACP content blocks（字段设计保留，见 ADR 0006 后果）。
+> 见 [12 跨 Agent 协作与互操作](12-cross-agent-collab.md)）。本节 3.1–3.3 描述当前
+> 实现形态：**ACP 化已落地**——task-brief 经 ACP content blocks 传递；此前的 `opencode run` 字符串契约是过渡
+> 形态，已被 ACP 取代（见 ADR 0006「被否决的选项」）。
 
 ### 3.1 编排者 → 执行者（同机）
 
 ```bash
-opencode run "实现 X，跑 typecheck-core，修到绿" --continue --format json
+# 执行者以 ACP server 形态运行（OpenCode / dsh 均为推荐执行者，不分先后）
+node <DSH_ROOT>/apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml
 ```
 
-执行者在自己的工作目录中运行，会话文件保存在项目目录，支持 `--continue` 跨天续跑。
+派发由编排者的 ACP client 发起（建会话 → `session/prompt` 携带 task-brief 的
+content blocks），执行者在自己的工作目录中运行；会话可跨任务接回
+（`session/load`/`resume`，见 ADR 0007 §9）。
 
 ### 3.2 编排者 → 执行者（跨机）
 
 ```bash
-ssh alrcatraz@<BUILD_HOST> "cd <PROJECT_DIR> && opencode run '构建并修复' --format json"
+# 同一条 ACP 启动命令，用 ssh 包装成远程 transport（协议不变，只换传输）
+ssh <USER>@<BUILD_HOST> "cd <PROJECT_DIR> && node <DSH_ROOT>/apps/cli/lib/bin.js --profile acp --patch executor/<OVERLAY>.yml"
 ```
 
 > 注意：本机场景去掉 ssh 自环；跨机场景才用 ssh。大文件传输（如容器镜像）优先流式管道而非 scp（已知教训：`/tmp` 是 tmpfs 易满，scp 大 tar 会卡死）。
