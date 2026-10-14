@@ -79,6 +79,18 @@
 - **选型依据不变**：决策基于接缝的**关系模型**（主从派活 vs 对等协作），
   非平台能力。执行者（dsh）无 A2A server（`packages/` 仅 ACP），主从
   派活仍走 ACP 子进程 stdio；A2A 仅留给未来「多编排者对等协作」。
+- **dsh 侧 A2A 现状（2026-10-14 补）**：dsh 核心（cordis）**无 A2A**——
+  `packages/` 无 A2A server/client/AgentCard（`subagent.sendMessage` /
+  `agent-team` mailbox 是**进程内** subagent 通信，README 明示
+  "process-local … not cross-process"，非 A2A）。但 dsh 插件生态已提供
+  A2A：`@ryubyte/dsh-a2a`（A2A v1.0 双向——server 入站 AgentCard +
+  JSONRPC + 真会话；client 出站 `a2a_call`/`a2a_list`）在 **dsh 0.2.1
+  官方 web profile 上实测通过**（入站 SendMessage → TASK_STATE_COMPLETED
+  + 会话 history；出站 state=connected + 注册调用工具）。
+  **注意**：这是社区插件（非官方），装它=引入 A2A 通道但**不改变本文
+  选型**——编排者↔执行者仍走 ACP；A2A 仅在「多编排者对等协作」需求
+  出现时启用（届时 Orchestrator-Beta↔Orchestrator-Beta 走 A2A）。另有 TtTRz/dsh-a2a peer 精确
+  pin 0.1.7-rc.2，不兼容 0.2.x，勿用。
 - **协议同名警示**：ACP 有双义——Agent **Client** Protocol（Zed 发起，
   dsh/Hermes copilot-acp 所用，独立活跃）与 Agent **Communication**
   Protocol（IBM BeeAI，2025-08-29 已并入 A2A）。本文「ACP」一律指
