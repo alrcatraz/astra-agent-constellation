@@ -284,6 +284,12 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   (<INTERNAL-A2A-PORT>/<SERVE-PORT>/<DASHBOARD-PORT>/<PORT>/<PORT>/<PORT>/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
   Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
+- **dsh-side A2A (an orchestrator that wants to be A2A-callable)**: dsh core
+  ships no A2A; install the community plugin `@ryubyte/dsh-a2a` (A2A v1.0
+  bidirectional, field-verified on dsh 0.2.x). Assembly recipe lives in the
+  orchestration-practice skill → `references/assembly/dsh-a2a-plugin/`
+  (covers the endpoint trap: routes register on the dsh WEB port, not the
+  `A2A_PORT` env port). TtTRz/dsh-a2a is incompatible with 0.2.x — do not use.
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
   *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
