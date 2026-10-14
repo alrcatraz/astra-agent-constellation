@@ -70,7 +70,6 @@ nav:
       - 演练剧本: 09-game-day.md
       - 总是知晓: 11-always-aware.md
       - 跨 Agent 协作与互操作: 12-cross-agent-collab.md
-      - DSH 编排者配置: 13-dsh-orchestrator-config.md
   - 采纳路径: 07-adoption.md
   - 决策记录:
       - references/0001-agent-platform-selection.md

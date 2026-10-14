@@ -139,6 +139,7 @@ that track.)
    rm -rf PLAN.md agent-registry/registry.yaml tasks
    # Files kept OUT of public entirely (leak topology / real hosts):
    #   docs/10-acp-mapping.md          (real test hosts)
+#   docs/13-dsh-orchestrator-config.md  (real deploy host/ports)
    #   docs/references/0006-...inter-agent-protocol-selection.md
    #   skills/.../references/a2a-interop.md  (real port plan)
    #   templates/cordis-executor.yml.example
@@ -180,7 +181,7 @@ that track.)
    git merge github/main -X ours -m "chore: reconcile github main history (new wins) (sanitised)"
    # (3) re-delete any leak file the merge resurrected; re-verify the WHOLE tree
    git rm --cached docs/10-acp-mapping.md ...          # whatever reappeared
-   git grep -nE "<deployment host>|<build host>|<deployment host>|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
+   git grep -nE "HC01|SUSETLearn00|homecentre|\.nb\.internal|10\.20\.|10\.30\." -- # must be empty
    git commit -S -m "chore: purge leak re-import (sanitised)"
    git push github public:development                    # now fast-forward
    ```
@@ -229,7 +230,7 @@ HERMES_COPILOT_ACP_COMMAND="bash"
 HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node apps/cli/lib/bin.js --profile acp --patch executor/acp-overlay.yml'"
 ```
 
-- Local (<deployment host>): command above. Remote (<build host>): same via
+- Local (HC01): command above. Remote (SUSETLearn00): same via
   `ssh -T -p <port> <build-host> "<command>"`.
 - **Executor key**: each machine's `AIGATE_EXECUTOR_KEY` lives ONLY in
   that host's `~/Projects/dsh/.env` (gitignored; dsh `loadEnv()` reads it
@@ -238,7 +239,7 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node apps/cli/lib/bin.js --pro
   `cordis.yml` references the env var name (`apiKeyEnv: AIGATE_EXECUTOR_KEY`),
   so the same config file works on every host.
 - dsh sandbox (workspace-write) has no headless ask-hang; verified local
-  (<deployment host>) and remote (<build host>). Deployment manual:
+  (HC01) and remote (SUSETLearn00). Deployment manual:
   `dsh-executor-deployment` skill.
 - **Legacy**: OpenCode remains supported as a fallback (same env-var
   mechanism, `opencode acp --cwd <workdir>`). When OpenCode adds official

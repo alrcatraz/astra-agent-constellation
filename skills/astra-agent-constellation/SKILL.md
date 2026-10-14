@@ -283,7 +283,6 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   L1 self-loopback → L2 dual-instance peering), Hermes port allocation
   (<INTERNAL-A2A-PORT>/<SERVE-PORT>/<DASHBOARD-PORT>/<PORT>/<PORT>/<PORT>/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
-  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
 - **dsh-side A2A (an orchestrator that wants to be A2A-callable)**: dsh core
   ships no A2A; install the community plugin `@ryubyte/dsh-a2a` (A2A v1.0
   bidirectional, field-verified on dsh 0.2.x). Assembly recipe lives in the
@@ -304,8 +303,8 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
   templates live in `templates/external-interop/` (did:wba only).
-  Outward A2A/ANP ports (<A2A-PORT>/<ANP-PORT> on the primary
-  host) and the internal <INTERNAL-A2A-PORT> Hermes A2A must not be conflated.
+  Outward A2A/ANP ports (9910/9911 on the primary
+  host) and the internal 9900 Hermes A2A must not be conflated.
 - **Internal multi-session collaboration** — how multiple Hermes sessions
   within *one* profile (the orchestrator's own team) coordinate via A2A.
   When a task spans multiple sessions/modules of the same agent and they must

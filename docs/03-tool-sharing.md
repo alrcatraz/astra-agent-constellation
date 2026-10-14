@@ -51,7 +51,7 @@
 {
   "provider": {
     "default": {
-      "baseURL": "http://127.0.0.1:<GATE-PORT>",
+      "baseURL": "http://127.0.0.1:20128",
       "models": { "coding": { "name": "deepseek-coding" } }
     }
   }
