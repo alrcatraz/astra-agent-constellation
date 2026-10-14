@@ -294,6 +294,12 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
   Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
+- **dsh 侧 A2A（编排者如 Orchestrator-Beta 想被 A2A 调用）**：dsh 核心无 A2A，需装
+  `@ryubyte/dsh-a2a` 插件（A2A v1.0 双向；0.2.1 实测入站 SendMessage→
+  TASK_STATE_COMPLETED+真会话、出站 state=connected+`a2a_call` 工具）。
+  装配实践见 `multiagent-orchestration-practice` →
+  `references/assembly/dsh-a2a-plugin/`（含端点陷阱：路由注册在 dsh
+  **web 端口**，非 `A2A_PORT`）。TtTRz/dsh-a2a 不兼容 0.2.x，勿用。
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
   *separate* concern from the internal Hermes A2A ladder above. When a task
   involves a foreign agent/group, the outward agent-card/`/rpc`/`/.well-known`
