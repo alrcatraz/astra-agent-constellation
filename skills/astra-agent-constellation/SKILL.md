@@ -66,7 +66,7 @@ by the orchestrator takes priority.
 ### 2. Invoking the executor (via ACP — OpenCode / dsh both recommended)
 
 - When splitting a task, generate a task brief (copy
-  `templates/task-brief/task-brief.md.example` →
+  `<repo>/templates/task-brief/task-brief.md.example` →
   `tasks/<ID>-<name>.md`): Metadata (agent-ref resolved via the registry) +
   Objective + Scope (including out-of-scope) + 5 Stopping Conditions +
   Acceptance Criteria (commands with expected results) + Hand-off + DoD.
@@ -219,13 +219,13 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   messages = British English (-ise/-our/-re).
 - **Sanitisation gate**: private copy (Gitea) holds real values; public copy
   (GitHub) MUST use placeholders (`<HOST-1>`/`<PORT-1>`) — zero real
-  agent/machine names. Run `scripts/registry-check.py` before publishing.
+  agent/machine names. Run `<repo>/scripts/registry-check.py` before publishing.
 - **git workflow**: feature → development → main via PRs; delivery shape =
   push development (Gitea first, GitHub second); feature branches are never
   the delivery; version tags are annotated.
 - **Verification gate**: after touching `mkdocs.yml`/`DESIGN.md`/`tokens.css`/
   docs run `mkdocs build --strict`; `bash -n scripts/health-check.sh`;
-  `python3 -m py_compile scripts/registry-check.py`. DESIGN.md ↔ mkdocs.yml ↔
+  `python3 -m py_compile <repo>/scripts/registry-check.py`. DESIGN.md ↔ mkdocs.yml ↔
   tokens.css must stay consistent (tokens.css = single source for
   colour/font/spacing).
 - **ADR**: decisions live in `docs/references/` (one file per decision;
@@ -293,12 +293,12 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   L1 self-loopback → L2 dual-instance peering), Hermes port allocation
   (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
-  Decision record: `docs/references/0006-inter-agent-protocol-selection.md`.
+  Decision record: `<repo>/docs/references/0006-inter-agent-protocol-selection.md`.
 - **dsh 侧 A2A（编排者如 Orchestrator-Beta 想被 A2A 调用）**：dsh 核心无 A2A，需装
   `@ryubyte/dsh-a2a` 插件（A2A v1.0 双向；0.2.1 实测入站 SendMessage→
   TASK_STATE_COMPLETED+真会话、出站 state=connected+`a2a_call` 工具）。
   装配实践见 `multiagent-orchestration-practice` →
-  `references/assembly/dsh-a2a-plugin/`（含端点陷阱：路由注册在 dsh
+  `multiagent-practice/references/assembly/dsh-a2a-plugin/`（含端点陷阱：路由注册在 dsh
   **web 端口**，非 `A2A_PORT`）。TtTRz/dsh-a2a 不兼容 0.2.x，勿用。
 - **External interop (A2A/ANP + did:wba)** — the public-facing boundary is a
   *separate* concern from the internal Hermes A2A ladder above. When a task
@@ -313,7 +313,7 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   §12.11 (enable did:wba operation checklist). For the dispatch bridge —
   outward A2A/ANP endpoints handing validated external tasks (with caller
   identity) to the *local* Hermes agent via `hermes -z` — see §12.12. The
-  templates live in `templates/external-interop/` (did:wba only).
+  templates live in `<repo>/templates/external-interop/` (did:wba only).
   Outward A2A/ANP ports (9910/9911 on the primary
   host) and the internal 9900 Hermes A2A must not be conflated.
 - **Internal multi-session collaboration** — how multiple Hermes sessions
