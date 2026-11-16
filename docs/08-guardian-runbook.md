@@ -8,7 +8,7 @@
 
 ## 0. 操作前通用步骤（MUST）
 
-1. **读注册表**：`agent-registry/registry.yaml` 中目标智能体的 `version` / `health_check` / `restart` 字段——本次操作的目标版本与验证方式**以注册表为准**。
+1. **读注册表**：活数据在 `the fleet registry repository`（发布端点 `the fleet registry endpoint`）的 `registry.yaml` 中目标智能体的 `version` / `health_check` / `restart` 字段——本次操作的目标版本与验证方式**以注册表为准**。
 2. **记当前状态**：注册表变更 + git status 留痕，作为操作前基线。
 3. **备份**：对目标做可回滚备份（配置/数据/依赖清单任一形式）。
 4. **定验证命令**：从注册表 `health_check` 或任务 brief 取**写死的命令与预期结果**，不临时发挥。

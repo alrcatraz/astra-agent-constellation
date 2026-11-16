@@ -130,7 +130,7 @@ that track.)
    git checkout main
    git checkout -B public             # re-point public at main's tree
    git rm --cached PLAN.md            # progression log, private-only
-   git rm --cached agent-registry/registry.yaml   # real registry
+   #   (the live registry moved to the fleet registry repository)
    git rm --cached -r tasks           # task-brief instances, real refs
    # Files kept OUT of public entirely (leak topology / real hosts):
    #   docs/10-acp-mapping.md          (real test hosts)
@@ -164,8 +164,9 @@ that track.)
   the reverse (Gitea-only files) is normal.
 - `development` is the deliverable branch name published to both remotes
   (`main:development`, `public:development`), never a feature branch.
-- Private-only content — `PLAN.md`, `agent-registry/registry.yaml`,
-  `tasks/` — MUST be removed from any tree pushed to GitHub.
+- Private-only content — `PLAN.md`, `tasks/` — MUST be removed from any tree
+  pushed to GitHub. The live registry is not in this repository at all: it lives
+  in `the fleet registry repository`.
 - Reconcile `public` by deletion/trimming from `main`; never `git merge`
   straight into `public` (that re-imports the private files).
 
