@@ -66,6 +66,32 @@ def main(path: str, private: bool = False) -> int:
                 errors.append(f"agent[{i}] {field} {value!r} must be a sanitised "
                               f"placeholder in the public copy (e.g. <CHAN-N>)")
 
+        # card (optional, registry 1.2.0): the agent's advertised card subset.
+        # A peer needs description, skills and capabilities before it calls;
+        # extra constellation facts ride in capabilities.extensions entries,
+        # each identified by a URI. required stays false (the card is complete
+        # without the extension).
+        card = agent.get("card")
+        if card is not None:
+            if not isinstance(card, dict):
+                errors.append(f"agent[{i}] card must be a mapping")
+            else:
+                if not isinstance(card.get("description"), str):
+                    errors.append(f"agent[{i}] card.description must be a string")
+                if "skills" in card and not isinstance(card["skills"], list):
+                    errors.append(f"agent[{i}] card.skills must be a list")
+                caps = card.get("capabilities")
+                if caps is not None and not isinstance(caps, dict):
+                    errors.append(f"agent[{i}] card.capabilities must be a mapping")
+                exts = (caps or {}).get("extensions")
+                if exts is not None:
+                    if not isinstance(exts, list):
+                        errors.append(f"agent[{i}] card.capabilities.extensions must be a list")
+                    else:
+                        for j, ext in enumerate(exts):
+                            if not isinstance(ext, dict) or not isinstance(ext.get("uri"), str):
+                                errors.append(f"agent[{i}] card.capabilities.extensions[{j}] must carry a uri string")
+
         # owner (agent-ref): MUST resolve to another entry in this registry.
         owner = agent.get(OWNER_FIELD)
         if owner is not None:

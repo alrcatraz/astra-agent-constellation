@@ -26,9 +26,23 @@
 #   python3 scripts/registry-check.py templates/agent-registry/registry.yaml.example  (public: all placeholders)
 #   python3 scripts/registry-check.py --private agent-registry/registry.yaml          (private: real values)
 
+# VERSIONING (semver on registry_version):
+#   MAJOR = a breaking shape change (a required field renamed or removed, an
+#           existing field's meaning changed)
+#   MINOR = an additive optional field (1.2.0 adds card)
+#   PATCH = text and validator fixes with no shape change
+# Consumers MUST accept unknown fields, so a minor bump never breaks a reader.
+#
+# CARD (1.2.0, optional): what a peer needs before it calls — description,
+#   skills, capabilities. Facts the A2A card has no field for (role, owner,
+#   device) ride in capabilities.extensions under one namespaced URI
+#   (urn:astra:constellation:v1); a peer that does not know the URI ignores
+#   it. required stays false: the card is complete without the extension.
+#   The endpoint itself is NOT here: the connection layer resolves host at
+#   run time.
 meta:
   constellation: astra-agent-constellation
-  registry_version: 1.1.0
+  registry_version: 1.2.0
   maintainer: alrcatraz
 
 agents:
@@ -47,6 +61,16 @@ agents:
     restart:
       ref: docs/06-gemini-pattern.md#6
 
+    card:                           # optional (1.2.0): what a peer needs before it calls
+      description: <DESC-N>
+      skills:
+        - id: <SKILL-N>
+          name: <SKILL-N>
+      capabilities:
+        streaming: true
+        extensions:
+          - uri: <EXT-N>            # e.g. urn:astra:constellation:v1
+            description: <EXT-DESC-N>
   - name: executor-dev
     role: executor
     host: <HOST-1>            # device-ref (same machine as orchestrator)

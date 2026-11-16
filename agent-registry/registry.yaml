@@ -21,9 +21,23 @@
 #   The concrete models behind each tier live in the model config layer (L2),
 #   NOT here — this registry only names the tier.
 
+# VERSIONING (semver on registry_version):
+#   MAJOR = a breaking shape change (a required field renamed or removed, an
+#           existing field's meaning changed)
+#   MINOR = an additive optional field (1.2.0 adds card)
+#   PATCH = text and validator fixes with no shape change
+# Consumers MUST accept unknown fields, so a minor bump never breaks a reader.
+#
+# CARD (1.2.0, optional): what a peer needs before it calls — description,
+#   skills, capabilities. Facts the A2A card has no field for (role, owner,
+#   device) ride in capabilities.extensions under one namespaced URI
+#   (urn:astra:constellation:v1); a peer that does not know the URI ignores
+#   it. required stays false: the card is complete without the extension.
+#   The endpoint itself is NOT here: the connection layer resolves host at
+#   run time.
 meta:
   constellation: astra-agent-constellation
-  registry_version: 1.1.0
+  registry_version: 1.2.0
   maintainer: alrcatraz
 
 agents:
@@ -42,6 +56,8 @@ agents:
     restart:
       ref: docs/07-adoption.md#phase-1
 
+    card:
+      description: "Astra orchestrator on the home orchestrator host (Hermes primary instance)"
   - name: executor-the home host
     role: executor
     host: the home orchestrator host            # device-ref (same machine as orchestrator)
@@ -56,6 +72,8 @@ agents:
     restart:
       ref: docs/07-adoption.md#phase-1
 
+    card:
+      description: "Astra executor on the home orchestrator host (DSH, ACP)"
   - name: executor-the dev orchestrator host
     role: executor
     host: the dev orchestrator host            # device-ref (build machine, SSH 2222)
@@ -75,6 +93,8 @@ agents:
   # isolation). Register when hardware is available, in this order:
   # real registry -> cron trigger chain -> guardian skill -> Game Day variant A.
   # Planned channel: Matrix (bot account not yet provisioned).
+    card:
+      description: "Astra executor on the dev orchestrator host (DSH, ACP)"
   - name: guardian-alpha
     role: guardian
     host: unassigned             # device-ref -> no carrier device yet
