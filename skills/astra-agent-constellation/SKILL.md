@@ -293,6 +293,9 @@ Flow (steps 1–2 are source analysis, 3–5 are the actual install):
   L1 self-loopback → L2 dual-instance peering), Hermes port allocation
   (9900/9901/9119/8642/8644/8645/9222), agent-card verification:
   `skill_view(name='astra-agent-constellation', file_path='references/a2a-interop.md')`.
+- Host data layout — models, container storage, runner state and toolchain
+  caches on an agent host, and which of them may be deleted:
+  `skill_view(name='astra-agent-constellation', file_path='references/agent-data-layout.md')`.
   Decision record: `<repo>/docs/references/0006-inter-agent-protocol-selection.md`.
 - **dsh 侧 A2A（编排者如 Orchestrator-Beta 想被 A2A 调用）**：dsh 核心无 A2A，需装
   `@ryubyte/dsh-a2a` 插件（A2A v1.0 双向；0.2.1 实测入站 SendMessage→
