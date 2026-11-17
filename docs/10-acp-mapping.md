@@ -16,23 +16,30 @@
 task-brief.md.example 模板保留为：① ACP 化之前当前实现形态的契约；
 ② 人类可读的完整版（`tasks/<TASK-ID>.md` 仍是执行者的工作文档）。
 
-## 2. ACP 内容块模型（0.9.0，官方 SDK 验证）
+## 2. ACP 内容块模型（ACP v1 稳定，2026-10-07 对照官方 schema 复核）
+
+> **版本说明**：原标注「0.9.0，官方 SDK 验证」已过时——ACP 现行为 **v1 稳定**
+> （Rust/TypeScript SDK 均 1.0）。v1 的 `ContentBlock` 与 **MCP 同构**
+> （Agent 可无缝转发 MCP 工具输出，零转换）。下表经官方 v1 schema 复核仍成立；
+> 字段补 `annotations`（可选展示元数据）、`uri`（image 可选源引用）。
+> **v2 draft（2026-07-20）** 的回合外 update / idle / 结构化 diff 仅作
+> forward path，不绑定（见 ADR 0007 §9.5）。
 
 `session/prompt` 请求的 `prompt` 字段是 content block 列表：
 
-| Block 类型 | type 值 | 关键字段 | 语义 |
+| Block 类型 | type 值 | 关键字段 | 语义 / 能力 |
 |:--|:--|:--|:--|
-| `TextContentBlock` | `text` | `text: str` | 文本载荷 |
-| `ImageContentBlock` | `image` | `data`(base64), `mimeType` | 图片 |
-| `AudioContentBlock` | `audio` | — | 音频 |
-| `ResourceContentBlock` | `resource_link` | `uri`, `name`, `description?`, `mimeType?`, `size?` | 资源链接（引用，不内嵌） |
-| `EmbeddedResourceContentBlock` | `resource` | 内嵌资源内容 | 资源内嵌（避免额外往返） |
+| `TextContentBlock` | `text` | `text: str`, `annotations?` | 文本载荷；**Agent 基线 MUST 支持** |
+| `ImageContentBlock` | `image` | `data`(base64), `mimeType`, `uri?`, `annotations?` | 图片；prompt 需 `image` 能力 |
+| `AudioContentBlock` | `audio` | `data`(base64), `mimeType`, `annotations?` | 音频；prompt 需 `audio` 能力 |
+| `EmbeddedResourceContentBlock` | `resource` | `resource{uri, text|blob, mimeType?}`, `annotations?` | 内嵌资源；prompt 需 `embeddedContext` 能力；**prompt 里带上下文的首选** |
+| `ResourceContentBlock` | `resource_link` | `uri`, `name`, `title?`, `description?`, `mimeType?`, `size?`, `annotations?` | 资源链接（引用，不内嵌） |
 
 - **MUST**：Agent 基线支持 `text` 与 `resource_link`；其余变体按
   `PromptCapabilities` 协商启用。
-- **MAY**：宿主以 `resource_link` 或 `resource` 引用上下文；**当可用时
-  `resource` 优先**——避免额外往返，且允许包含 Agent 无法直接访问的
-  上下文源（schema 原文语义）。
+- **MAY**：宿主以 `resource_link` 或 `resource` 引用上下文；**prompt 内带
+  上下文时 `resource` 优先**——直接内嵌内容、允许包含 Agent 无法直接访问的
+  上下文源（@-引用文件即此形态，v1 明文「preferred way」）。
 - **MAY**：`_meta` 字段（block 级 + 请求级）供宿主/Agent 附加元数据，
   实现不得假设其值——task-brief Metadata 的天然落点。
 
@@ -53,15 +60,19 @@ task-brief.md.example 模板保留为：① ACP 化之前当前实现形态的�
 
 ```
 编排者（ACP client）
-  │  1. session/new            → sessionId
-  │  2. session/prompt         → [Objective, Scope, Stopping, 验收命令×N] (+_meta)
-  │  3. session/update         ← 执行者中间结果（可选）
-  │  4. session/cancel / 中断  （停止条件触发时）
-  │  5. 完成 → 编排者重跑验收 + diff 审查（04 §2 纪律不变）
+  │  1. initialize → 能力协商（一次性，连接建立时）
+  │  2. session/new → 新会话  ／  session/load → 接回既有会话（常驻复用，见 ADR 0007 §9.1）
+  │  3. session/prompt   → [Objective, Scope, Stopping, Budget, 验收命令×N] (+_meta)
+  │  4. session/update   ← 执行者中间结果 / 进度信号（② 存活检测的信号源）
+  │  5. session/cancel   ← 停止（v1 名 `session/cancel`，通知无响应；非 `$/cancel_request`）
+  │  6. 完成 → 编排者重跑验收 + diff 审查（04 §2 纪律不变）
   ▼
-执行者（ACP server，OpenCode）
+执行者（ACP server，OpenCode / DSH，常驻）
 ```
 
+- **MUST**：会话建立（initialize + session/new）只在首次付一次，后续派发经
+  `session/load` 接回——常驻 + 跨任务复用使 ①收活窗口 的握手不重复冷启动
+  （ADR 0007 §9.1）。
 - **MUST**：验收命令逐条可重放——编排者重跑（05 §3）不依赖执行者自报。
 - **MUST**：`_meta` 含 Task ID，使审计（05 §5.1）可经 Task ID 关联
   ACP 会话与执行者 session JSONL（输入完整性：模型可见输入可追溯）。
@@ -129,7 +140,7 @@ Hermes 内部路径：`agent.acp_command` ← `runtime.get("command")` ←
 
 ### 执行者能力差异（映射设计的适配维度，2026-08-14 查证 + 2026-08-14 实测）
 
-映射设计假定执行者具备 OpenCode 的能力集。换执行者（如实测 dsh）时按此表适配：
+映射基线是执行者角色所需的能力集。OpenCode 与 dsh 均为推荐执行者（当前实际部署=dsh）；下表即差异，换执行者时按此表适配：
 
 | 能力 | OpenCode 1.18.15（实测） | dsh acp server（实测） |
 |:--|:--|:--|

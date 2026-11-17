@@ -2,6 +2,15 @@
 #
 # Based on the official examples/acp-agent/cordis.yml blueprint (18 plugins,
 # all kept) + capability groups added for full development load.
+#
+# Runnable form (0.1.7-rc.2+ profile system):
+#   node apps/cli/lib/bin.js --profile acp --patch executor/acp-overlay.yml
+#   — the profile base carries the official acp-agent composition; our overlay
+#   carries per-deployment wiring (AIGate route, MCP endpoints, persona).
+# This file stays as the FULL reference composition (what the layers contain);
+# the direct `--config executor/cordis.yml` boot is the pre-rc.2 form (≤0.1.6).
+# Canonical boot: docs/13-dsh-orchestrator-config.md §"Boot / launch (canonical)".
+#
 # LLM: AIGate (OpenAI-compatible gateway) via llm-pi-ai hand-declared route.
 # Transport: ACP server (stdio) — driven by the orchestrator (Hermes).
 #
