@@ -251,3 +251,10 @@ HERMES_COPILOT_ACP_ARGS="-c 'cd ~/Projects/dsh && node apps/cli/lib/bin.js --pro
 - No placeholder comments for deleted content ("XXX removed" style).
 - Comments explain WHY, never WHAT changed.
 - No orphan TODO markers.
+
+## Publication guard
+
+Before every commit and push, run `scripts/check-privacy.sh` — the blueprint is a
+concept document and must carry zero fleet-private facts (real hosts, the forge
+domain, instance names, the private registry repository). The live registry and
+its publication endpoint live in the fleet registry repository, never here.
